@@ -16,5 +16,7 @@
   "preset_cinema": "Cinema",
   "preset_outdoor": "Outdoor",
   "preset_eco": "Eco Battery",
-  "optimal_edid": "Optimal Display (EDID)"
+  "optimal_edid": "Optimal EDID",
+  "rescan": "󰑐 Rescan Display",
+  "rescan_tooltip": "Rescan hardware capabilities, display and EDID"
 }

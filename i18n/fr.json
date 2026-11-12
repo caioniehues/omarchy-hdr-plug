@@ -16,5 +16,7 @@
   "preset_cinema": "Cinéma",
   "preset_outdoor": "Plein Jour",
   "preset_eco": "Éco Batterie",
-  "optimal_edid": "Optimal Écran (EDID)"
+  "optimal_edid": "Optimal EDID",
+  "rescan": "󰑐 Rescan Écran",
+  "rescan_tooltip": "Réanalyser le matériel, la dalle et l'EDID"
 }

@@ -41,6 +41,11 @@ Panel {
     if (!statusProc.running) statusProc.running = true
   }
 
+  function rescanHardware() {
+    statusProc.running = false
+    statusProc.running = true
+  }
+
   function runAction(args) {
     if (actionProc.running) return
     actionProc.command = [root.setScript].concat(args)
@@ -160,13 +165,13 @@ Panel {
         // 1. Header Section
         Item {
           width: parent.width
-          implicitHeight: Math.max(heroTexts.implicitHeight, toggleBtn.implicitHeight)
+          implicitHeight: Math.max(heroTexts.implicitHeight, headerButtons.implicitHeight)
 
           Column {
             id: heroTexts
             anchors.left: parent.left
-            anchors.right: toggleBtn.left
-            anchors.rightMargin: Style.space(12)
+            anchors.right: headerButtons.left
+            anchors.rightMargin: Style.space(10)
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(2)
 
@@ -193,15 +198,28 @@ Panel {
             }
           }
 
-          Button {
-            id: toggleBtn
+          Row {
+            id: headerButtons
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            text: root.hdrEnabled ? strings.t("active") : strings.t("inactive")
-            active: root.hdrEnabled
-            bordered: true
-            fontSize: Style.font.bodySmall
-            onClicked: root.toggleHdr()
+            spacing: Style.space(6)
+
+            Button {
+              text: "󰑐"
+              tooltipText: strings.t("rescan_tooltip")
+              bordered: true
+              fontSize: Style.font.bodySmall
+              onClicked: root.rescanHardware()
+            }
+
+            Button {
+              id: toggleBtn
+              text: root.hdrEnabled ? strings.t("active") : strings.t("inactive")
+              active: root.hdrEnabled
+              bordered: true
+              fontSize: Style.font.bodySmall
+              onClicked: root.toggleHdr()
+            }
           }
         }
 
@@ -291,7 +309,7 @@ Panel {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 textFormat: Text.PlainText
-                text: Math.round(root.sdrMaxLum) + " nits (EDID: " + Math.round(root.edidMaxLum) + " nits)"
+                text: Math.round(root.sdrMaxLum) + " nits (Dalle: " + Math.round(root.edidMaxLum) + " nits)"
                 font.family: root.bar ? root.bar.fontFamily : "sans-serif"
                 font.pixelSize: Style.font.bodySmall
                 font.bold: true
@@ -302,8 +320,8 @@ Panel {
             PanelSlider {
               bar: root.bar
               width: parent.width
-              minimum: 150
-              maximum: Math.max(800, root.edidMaxLum)
+              minimum: 100
+              maximum: Math.max(2000, root.edidMaxLum)
               step: 10
               value: root.sdrMaxLum
               onMoved: function(v) {
@@ -499,24 +517,33 @@ Panel {
           }
         }
 
-        // 6. Footer
+        // 6. Footer Actions
         Row {
           width: parent.width
-          spacing: Style.space(8)
+          spacing: Style.space(6)
 
           Button {
-            width: (parent.width - Style.space(8)) / 2
+            width: (parent.width - Style.space(12)) / 3
             text: strings.t("optimal_edid")
-            fontSize: Style.font.bodySmall
+            fontSize: Style.font.caption
             bordered: true
             onClicked: root.applyPreset("optimal")
           }
 
           Button {
-            width: (parent.width - Style.space(8)) / 2
+            width: (parent.width - Style.space(12)) / 3
+            text: strings.t("rescan")
+            tooltipText: strings.t("rescan_tooltip")
+            fontSize: Style.font.caption
+            bordered: true
+            onClicked: root.rescanHardware()
+          }
+
+          Button {
+            width: (parent.width - Style.space(12)) / 3
             text: root.hdrEnabled ? strings.t("disable") : strings.t("enable")
             active: !root.hdrEnabled
-            fontSize: Style.font.bodySmall
+            fontSize: Style.font.caption
             bordered: true
             onClicked: root.toggleHdr()
           }
