@@ -1,0 +1,24 @@
+#!/bin/bash
+# Returns JSON status of HDR and controls
+MONITOR="${1:-eDP-1}"
+INFO=$(hyprctl monitors -j | jq -c --arg m "$MONITOR" '.[] | select(.name == $m)')
+
+if [[ -z "$INFO" ]]; then
+  echo '{"enabled":false,"sdrBrightness":1.0,"sdrSaturation":1.0,"sdrMaxLuminance":400,"maxLuminance":617}'
+  exit 0
+fi
+
+PRESET=$(echo "$INFO" | jq -r '.colorManagementPreset // "srgb"')
+ENABLED=$([[ "$PRESET" == "hdr" ]] && echo "true" || echo "false")
+SDR_B=$(echo "$INFO" | jq -r '.sdrBrightness // 1.0')
+SDR_S=$(echo "$INFO" | jq -r '.sdrSaturation // 1.0')
+SDR_MAX_LUM=$(echo "$INFO" | jq -r '.sdrMaxLuminance // 400')
+MAX_LUM=$(echo "$INFO" | jq -r '.maxLuminance // 617')
+
+jq -n \
+  --argjson enabled "$ENABLED" \
+  --argjson sdrBrightness "$SDR_B" \
+  --argjson sdrSaturation "$SDR_S" \
+  --argjson sdrMaxLuminance "$SDR_MAX_LUM" \
+  --argjson maxLuminance "$MAX_LUM" \
+  '{enabled: $enabled, sdrBrightness: $sdrBrightness, sdrSaturation: $sdrSaturation, sdrMaxLuminance: $sdrMaxLuminance, maxLuminance: $maxLuminance}'

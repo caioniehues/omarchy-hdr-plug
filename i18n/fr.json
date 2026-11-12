@@ -1,0 +1,20 @@
+{
+  "title": "Affichage HDR & Couleur",
+  "active": "ACTIF (ON)",
+  "inactive": "INACTIF (OFF)",
+  "disable": "Désactiver",
+  "enable": "Activer",
+  "toggle_tooltip_on": "HDR Activé (Clic: réglages / Clic droit: ON/OFF)",
+  "toggle_tooltip_off": "HDR Désactivé (Clic: activer)",
+  "sdr_max_lum": "Luminance Cible SDR",
+  "sdr_brightness": "Gain Luminosité SDR",
+  "sdr_saturation": "Saturation Couleurs SDR",
+  "color_gamut": "Espace de Couleurs",
+  "backlight_sync": "Synchronisation Rétroéclairage",
+  "presets_title": "Profils Rapides",
+  "preset_vivid": "Vivid OLED",
+  "preset_cinema": "Cinéma",
+  "preset_outdoor": "Plein Jour",
+  "preset_eco": "Éco Batterie",
+  "optimal_edid": "Optimal Écran (EDID)"
+}

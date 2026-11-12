@@ -1,0 +1,123 @@
+#!/bin/bash
+# Returns rich JSON status of HDR, EDID capabilities, and color controls
+set -e
+
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+STATE_FILE="$PLUGIN_DIR/state.json"
+
+RAW_MONITORS=$(hyprctl monitors -j 2>/dev/null || true)
+if [[ -n "$RAW_MONITORS" ]] && jq -e . <<<"$RAW_MONITORS" >/dev/null 2>&1; then
+  MONITORS_JSON="$RAW_MONITORS"
+else
+  MONITORS_JSON="[]"
+fi
+
+# 1. Determine active/focused monitor
+TARGET_MON="$1"
+if [[ -z "$TARGET_MON" ]]; then
+  TARGET_MON=$(echo "$MONITORS_JSON" | jq -r '(.[] | select(.focused == true) | .name) // (.[0] | .name) // "eDP-1"' 2>/dev/null || echo "eDP-1")
+fi
+[[ -z "$TARGET_MON" || "$TARGET_MON" == "null" ]] && TARGET_MON="eDP-1"
+
+MON_INFO=$(echo "$MONITORS_JSON" | jq -c --arg m "$TARGET_MON" '(.[] | select(.name == $m)) // empty' 2>/dev/null || echo "")
+
+if [[ -z "$MON_INFO" || "$MON_INFO" == "null" ]]; then
+  MON_DESC="Display $TARGET_MON"
+  SCALE=1.666667
+  HYPR_CM="hdr"
+else
+  MON_DESC=$(echo "$MON_INFO" | jq -r '.description // .name // "Display"' 2>/dev/null || echo "Display")
+  SCALE=$(echo "$MON_INFO" | jq -r '.scale // 1.666667' 2>/dev/null || echo "1.666667")
+  HYPR_CM=$(echo "$MON_INFO" | jq -r '.colorManagementPreset // "srgb"' 2>/dev/null || echo "hdr")
+fi
+
+# 2. Extract EDID metadata dynamically
+EDID_FILE=$(ls /sys/class/drm/*-"$TARGET_MON"/edid 2>/dev/null | head -n 1 || true)
+EDID_MAX_L=617
+EDID_AVG_L=400
+EDID_MIN_L=0.005
+
+if [[ -n "$EDID_FILE" && -s "$EDID_FILE" ]] && command -v edid-decode >/dev/null 2>&1; then
+  DECODED=$(edid-decode "$EDID_FILE" 2>/dev/null || true)
+  MAX_VAL=$(echo "$DECODED" | grep -m1 "Desired content max luminance" | sed -E 's/.*\(([0-9.]+).*/\1/' || true)
+  AVG_VAL=$(echo "$DECODED" | grep -m1 "Desired content max frame-average luminance" | sed -E 's/.*\(([0-9.]+).*/\1/' || true)
+  MIN_VAL=$(echo "$DECODED" | grep -m1 "Desired content min luminance" | sed -E 's/.*\(([0-9.]+).*/\1/' || true)
+
+  if [[ -n "$MAX_VAL" ]]; then
+    PARSED_MAX=$(echo "$MAX_VAL" | awk '{print int($1+0.5)}' 2>/dev/null || true)
+    [[ -n "$PARSED_MAX" && "$PARSED_MAX" -gt 0 ]] && EDID_MAX_L="$PARSED_MAX"
+  fi
+  if [[ -n "$AVG_VAL" ]]; then
+    PARSED_AVG=$(echo "$AVG_VAL" | awk '{print int($1+0.5)}' 2>/dev/null || true)
+    [[ -n "$PARSED_AVG" && "$PARSED_AVG" -gt 0 ]] && EDID_AVG_L="$PARSED_AVG"
+  fi
+  if [[ -n "$MIN_VAL" ]]; then
+    EDID_MIN_L="$MIN_VAL"
+  fi
+fi
+
+# Ensure safe fallbacks
+: "${EDID_MAX_L:=617}"
+: "${EDID_AVG_L:=400}"
+: "${EDID_MIN_L:=0.005}"
+: "${SCALE:=1.666667}"
+
+# 3. Read persistent user state
+if [[ -f "$STATE_FILE" ]]; then
+  ENABLED=$(jq -r 'if .enabled != null then .enabled else true end' "$STATE_FILE" 2>/dev/null || echo "true")
+  SDR_B=$(jq -r 'if .sdrBrightness != null then .sdrBrightness else 2.0 end' "$STATE_FILE" 2>/dev/null || echo "2.0")
+  SDR_S=$(jq -r 'if .sdrSaturation != null then .sdrSaturation else 1.15 end' "$STATE_FILE" 2>/dev/null || echo "1.15")
+  SDR_MAX_L=$(jq -r 'if .sdrMaxLuminance != null then .sdrMaxLuminance else 617 end' "$STATE_FILE" 2>/dev/null || echo "617")
+  CM_PRESET=$(jq -r 'if .cm != null then .cm else "hdr" end' "$STATE_FILE" 2>/dev/null || echo "hdr")
+  BL_SYNC=$(jq -r 'if .backlightSync != null then .backlightSync else true end' "$STATE_FILE" 2>/dev/null || echo "true")
+  PRESET=$(jq -r 'if .preset != null then .preset else "vivid" end' "$STATE_FILE" 2>/dev/null || echo "vivid")
+else
+  ENABLED=$([[ "$HYPR_CM" == "hdr" ]] && echo "true" || echo "false")
+  SDR_B="2.0"
+  SDR_S="1.15"
+  SDR_MAX_L="$EDID_MAX_L"
+  CM_PRESET="hdr"
+  BL_SYNC="true"
+  PRESET="vivid"
+fi
+
+: "${ENABLED:=true}"
+: "${SDR_B:=2.0}"
+: "${SDR_S:=1.15}"
+: "${SDR_MAX_L:=617}"
+: "${CM_PRESET:=hdr}"
+: "${BL_SYNC:=true}"
+: "${PRESET:=vivid}"
+
+# 4. Emit complete JSON
+jq -n \
+  --arg mon "$TARGET_MON" \
+  --arg desc "$MON_DESC" \
+  --argjson scale "$SCALE" \
+  --argjson enabled "$ENABLED" \
+  --argjson sdrBrightness "$SDR_B" \
+  --argjson sdrSaturation "$SDR_S" \
+  --argjson sdrMaxLuminance "$SDR_MAX_L" \
+  --argjson maxLuminance "$EDID_MAX_L" \
+  --argjson edidMaxLuminance "$EDID_MAX_L" \
+  --argjson edidAvgLuminance "$EDID_AVG_L" \
+  --argjson edidMinLuminance "$EDID_MIN_L" \
+  --arg cm "$CM_PRESET" \
+  --argjson backlightSync "$BL_SYNC" \
+  --arg preset "$PRESET" \
+  '{
+    monitor: $mon,
+    monitorName: $desc,
+    scale: $scale,
+    enabled: $enabled,
+    sdrBrightness: $sdrBrightness,
+    sdrSaturation: $sdrSaturation,
+    sdrMaxLuminance: $sdrMaxLuminance,
+    maxLuminance: $maxLuminance,
+    edidMaxLuminance: $edidMaxLuminance,
+    edidAvgLuminance: $edidAvgLuminance,
+    edidMinLuminance: $edidMinLuminance,
+    cm: $cm,
+    backlightSync: $backlightSync,
+    preset: $preset
+  }'

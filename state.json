@@ -1,0 +1,10 @@
+{
+  "monitor": "eDP-1",
+  "enabled": true,
+  "sdrBrightness": 1.80,
+  "sdrSaturation": 1.15,
+  "sdrMaxLuminance": 617,
+  "cm": "hdr",
+  "backlightSync": true,
+  "preset": "vivid"
+}

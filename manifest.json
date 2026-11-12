@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "vedix.hdr",
+  "name": "HDR Control",
+  "version": "1.0.0",
+  "author": "Omarchy",
+  "description": "HDR toggle and color luminance controls",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "HDR",
+    "description": "HDR toggle and display controls",
+    "category": "System",
+    "allowMultiple": false
+  }
+}
