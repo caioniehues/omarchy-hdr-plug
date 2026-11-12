@@ -261,6 +261,13 @@ Panel {
                 onClicked: root.setCm("hdr")
               }
               Button {
+                text: "HDR-EDID"
+                active: root.cmPreset === "hdredid"
+                fontSize: Style.font.caption
+                bordered: true
+                onClicked: root.setCm("hdredid")
+              }
+              Button {
                 text: "DCI-P3"
                 active: root.cmPreset === "dcip3"
                 fontSize: Style.font.caption
