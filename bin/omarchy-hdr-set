@@ -1,40 +1,134 @@
-#!/bin/bash
-# Sets HDR parameters, updates state.json, applies changes via Hyprland IPC, and generates ~/.config/hypr/hdr.lua
-set -e
+#!/usr/bin/env bash
+# Sets HDR parameters, updates XDG per-monitor state.json, applies changes via Hyprland IPC,
+# controls hyprsunset color temperature, and generates ~/.config/hypr/hdr.lua.
+set -euo pipefail
+
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+STATUS_BIN="$PLUGIN_DIR/bin/omarchy-hdr-status"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/vedix.hdr"
+STATE_FILE="$STATE_DIR/state.json"
+LEGACY_STATE_FILE="$PLUGIN_DIR/state.json"
+HYPRSUNSET_PID_FILE="$STATE_DIR/hyprsunset.pid"
+HDR_CONF="$HOME/.config/hypr/hdr.lua"
+
+# Parse optional --monitor <name>
+TARGET_MON="${HDR_MONITOR:-}"
+if [[ "${1:-}" == "--monitor" && -n "${2:-}" ]]; then
+  TARGET_MON="$2"
+  shift 2
+fi
 
 ACTION="${1:-toggle}"
 PARAM="${2:-}"
 EXTRA="${3:-}"
 
-PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-STATE_FILE="$PLUGIN_DIR/state.json"
-STATUS_BIN="$PLUGIN_DIR/bin/omarchy-hdr-status"
-HDR_CONF="$HOME/.config/hypr/hdr.lua"
+notify_hdr() {
+  local title="$1"
+  local body="$2"
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send -a "Omarchy HDR" -i "video-display" \
+      -h string:x-canonical-private-synchronous:hdr-status \
+      "$title" "$body" >/dev/null 2>&1 || true
+  fi
+}
+
+apply_color_temp() {
+  local temp="$1"
+  # Clamp integer between 3000 and 9000
+  temp=$(awk -v t="$temp" 'BEGIN {
+    v = int(t + 0.5);
+    if (v < 3000) v = 3000;
+    if (v > 9000) v = 9000;
+    print v;
+  }')
+
+  if command -v hyprsunset >/dev/null 2>&1; then
+    if ! pgrep -x hyprsunset >/dev/null 2>&1 && [[ "$temp" -ne 6500 ]]; then
+      mkdir -p "$STATE_DIR"
+      nohup hyprsunset >/dev/null 2>&1 &
+      echo $! > "$HYPRSUNSET_PID_FILE"
+      sleep 0.25
+    fi
+
+    if pgrep -x hyprsunset >/dev/null 2>&1; then
+      if [[ "$temp" -eq 6500 ]]; then
+        hyprctl hyprsunset identity >/dev/null 2>&1 || true
+      else
+        hyprctl hyprsunset temperature "$temp" >/dev/null 2>&1 || true
+      fi
+    fi
+  fi
+
+  echo "$temp"
+}
+
+reset_all() {
+  # 1. Reset color temperature / stop plugin-started hyprsunset
+  if command -v hyprctl >/dev/null 2>&1 && pgrep -x hyprsunset >/dev/null 2>&1; then
+    hyprctl hyprsunset identity >/dev/null 2>&1 || true
+  fi
+  if [[ -f "$HYPRSUNSET_PID_FILE" ]]; then
+    local pid
+    pid=$(cat "$HYPRSUNSET_PID_FILE" 2>/dev/null || true)
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      kill "$pid" >/dev/null 2>&1 || true
+    fi
+    rm -f "$HYPRSUNSET_PID_FILE"
+  fi
+
+  # 2. Remove generated Hyprland config and state files
+  rm -f "$HDR_CONF" "$STATE_FILE" "$LEGACY_STATE_FILE"
+  rmdir "$STATE_DIR" 2>/dev/null || true
+
+  # 3. Reload Hyprland to restore stock monitors.lua configuration
+  if command -v hyprctl >/dev/null 2>&1; then
+    hyprctl reload >/dev/null 2>&1 || true
+  fi
+
+  notify_hdr "Affichage HDR" "Configuration réinitialisée à l'état d'origine"
+  exit 0
+}
+
+if [[ "$ACTION" == "reset" ]]; then
+  reset_all
+fi
 
 # 1. Fetch current status & capabilities
-CURRENT_JSON=$("$STATUS_BIN" 2>/dev/null || echo "{}")
-MONITOR=$(echo "$CURRENT_JSON" | jq -r '.monitor // "eDP-1"' 2>/dev/null || echo "eDP-1")
-SCALE=$(echo "$CURRENT_JSON" | jq -r '.scale // 1.666667' 2>/dev/null || echo "1.666667")
-EDID_MAX_L=$(echo "$CURRENT_JSON" | jq -r '.edidMaxLuminance // 617' 2>/dev/null || echo "617")
-EDID_AVG_L=$(echo "$CURRENT_JSON" | jq -r '.edidAvgLuminance // 400' 2>/dev/null || echo "400")
-EDID_MIN_L=$(echo "$CURRENT_JSON" | jq -r '.edidMinLuminance // 0.005' 2>/dev/null || echo "0.005")
+if [[ -n "$TARGET_MON" ]]; then
+  CURRENT_JSON=$("$STATUS_BIN" "$TARGET_MON" 2>/dev/null || echo "{}")
+else
+  CURRENT_JSON=$("$STATUS_BIN" 2>/dev/null || echo "{}")
+fi
 
-IS_ENABLED=$(echo "$CURRENT_JSON" | jq -r 'if .enabled != null then .enabled else true end' 2>/dev/null || echo "true")
-SDR_B=$(echo "$CURRENT_JSON" | jq -r '.sdrBrightness // 2.0' 2>/dev/null || echo "2.0")
-SDR_S=$(echo "$CURRENT_JSON" | jq -r '.sdrSaturation // 1.15' 2>/dev/null || echo "1.15")
-SDR_MAX_L=$(echo "$CURRENT_JSON" | jq -r '.sdrMaxLuminance // 617' 2>/dev/null || echo "617")
-CM_PRESET=$(echo "$CURRENT_JSON" | jq -r '.cm // "hdr"' 2>/dev/null || echo "hdr")
-BL_SYNC=$(echo "$CURRENT_JSON" | jq -r 'if .backlightSync != null then .backlightSync else true end' 2>/dev/null || echo "true")
-PRESET=$(echo "$CURRENT_JSON" | jq -r '.preset // "custom"' 2>/dev/null || echo "custom")
+MONITOR=$(jq -r '.monitor // "eDP-1"' <<<"$CURRENT_JSON" 2>/dev/null || echo "eDP-1")
+SCALE=$(jq -r '.scale // 1.0' <<<"$CURRENT_JSON" 2>/dev/null || echo "1.0")
+EDID_MAX_L=$(jq -r '.edidMaxLuminance // 617' <<<"$CURRENT_JSON" 2>/dev/null || echo "617")
+EDID_AVG_L=$(jq -r '.edidAvgLuminance // 400' <<<"$CURRENT_JSON" 2>/dev/null || echo "400")
+EDID_MIN_L=$(jq -r '.edidMinLuminance // 0.005' <<<"$CURRENT_JSON" 2>/dev/null || echo "0.005")
 
-# 2. Process action
+IS_ENABLED=$(jq -r 'if .enabled != null then .enabled else true end' <<<"$CURRENT_JSON" 2>/dev/null || echo "true")
+SDR_B=$(jq -r '.sdrBrightness // 1.80' <<<"$CURRENT_JSON" 2>/dev/null || echo "1.80")
+SDR_S=$(jq -r '.sdrSaturation // 1.15' <<<"$CURRENT_JSON" 2>/dev/null || echo "1.15")
+SDR_MAX_L=$(jq -r --argjson d "$EDID_MAX_L" '.sdrMaxLuminance // $d' <<<"$CURRENT_JSON" 2>/dev/null || echo "$EDID_MAX_L")
+CM_PRESET=$(jq -r '.cm // "hdr"' <<<"$CURRENT_JSON" 2>/dev/null || echo "hdr")
+BL_SYNC=$(jq -r 'if .backlightSync != null then .backlightSync else true end' <<<"$CURRENT_JSON" 2>/dev/null || echo "true")
+PRESET=$(jq -r '.preset // "custom"' <<<"$CURRENT_JSON" 2>/dev/null || echo "custom")
+COLOR_TEMP=$(jq -r '.colorTemp // 6500' <<<"$CURRENT_JSON" 2>/dev/null || echo "6500")
+
+# Fast-path for color temperature: update hyprsunset + state.json without rewriting hdr.lua
+if [[ "$ACTION" == "temperature" ]]; then
+  [[ -n "$PARAM" ]] && COLOR_TEMP=$(apply_color_temp "$PARAM")
+  mkdir -p "$STATE_DIR"
+  BASE_STATE="{}"
+  [[ -f "$STATE_FILE" ]] && jq -e . "$STATE_FILE" >/dev/null 2>&1 && BASE_STATE=$(cat "$STATE_FILE")
+  jq --argjson ct "$COLOR_TEMP" '.colorTemp = $ct' <<<"$BASE_STATE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+  exit 0
+fi
+
+# 2. Process HDR / display action
 case "$ACTION" in
   toggle)
-    if [[ "$IS_ENABLED" == "true" ]]; then
-      IS_ENABLED="false"
-    else
-      IS_ENABLED="true"
-    fi
+    IS_ENABLED=$([[ "$IS_ENABLED" == "true" ]] && echo "false" || echo "true")
     ;;
   on)
     IS_ENABLED="true"
@@ -45,14 +139,10 @@ case "$ACTION" in
   apply)
     [[ -n "$PARAM" ]] && SDR_B="$PARAM"
     [[ -n "$EXTRA" ]] && SDR_S="$EXTRA"
-    [[ -n "$4" ]] && SDR_MAX_L="$4"
-    [[ -n "$5" ]] && CM_PRESET="$5"
-    if [[ -n "$6" ]]; then
-      if [[ "$6" == "false" || "$6" == "0" ]]; then
-        BL_SYNC="false"
-      else
-        BL_SYNC="true"
-      fi
+    [[ -n "${4:-}" ]] && SDR_MAX_L="$4"
+    [[ -n "${5:-}" ]] && CM_PRESET="$5"
+    if [[ -n "${6:-}" ]]; then
+      BL_SYNC=$([[ "$6" == "false" || "$6" == "0" ]] && echo "false" || echo "true")
     fi
     PRESET="custom"
     ;;
@@ -73,11 +163,7 @@ case "$ACTION" in
     PRESET="custom"
     ;;
   backlight_sync)
-    if [[ "$PARAM" == "false" || "$PARAM" == "0" ]]; then
-      BL_SYNC="false"
-    else
-      BL_SYNC="true"
-    fi
+    BL_SYNC=$([[ "$PARAM" == "false" || "$PARAM" == "0" ]] && echo "false" || echo "true")
     ;;
   preset)
     case "$PARAM" in
@@ -89,6 +175,17 @@ case "$ACTION" in
         CM_PRESET="hdr"
         BL_SYNC="true"
         PRESET="vivid"
+        COLOR_TEMP="6500"
+        ;;
+      cinema_hdr)
+        IS_ENABLED="true"
+        SDR_B="1.10"
+        SDR_S="1.00"
+        SDR_MAX_L="$EDID_MAX_L"
+        CM_PRESET="hdr"
+        BL_SYNC="false"
+        PRESET="cinema_hdr"
+        COLOR_TEMP="5800"
         ;;
       cinema)
         IS_ENABLED="true"
@@ -98,6 +195,7 @@ case "$ACTION" in
         CM_PRESET="dcip3"
         BL_SYNC="false"
         PRESET="cinema"
+        COLOR_TEMP="5800"
         ;;
       outdoor)
         IS_ENABLED="true"
@@ -107,6 +205,7 @@ case "$ACTION" in
         CM_PRESET="hdr"
         BL_SYNC="true"
         PRESET="outdoor"
+        COLOR_TEMP="6500"
         ;;
       eco)
         IS_ENABLED="false"
@@ -116,6 +215,7 @@ case "$ACTION" in
         CM_PRESET="srgb"
         BL_SYNC="true"
         PRESET="eco"
+        COLOR_TEMP="6500"
         ;;
       optimal)
         IS_ENABLED="true"
@@ -125,94 +225,98 @@ case "$ACTION" in
         CM_PRESET="hdr"
         BL_SYNC="true"
         PRESET="optimal"
+        COLOR_TEMP="6500"
         ;;
     esac
+    COLOR_TEMP=$(apply_color_temp "$COLOR_TEMP")
     ;;
 esac
 
-# 3. Update persistent state.json safely
-if [[ -w "$STATE_FILE" ]] || [[ ! -e "$STATE_FILE" && -w "$(dirname "$STATE_FILE")" ]]; then
-  jq -n \
-    --arg mon "$MONITOR" \
-    --argjson enabled "$IS_ENABLED" \
-    --argjson sdrB "$SDR_B" \
-    --argjson sdrS "$SDR_S" \
-    --argjson sdrMaxL "$SDR_MAX_L" \
-    --arg cm "$CM_PRESET" \
-    --argjson blSync "$BL_SYNC" \
-    --arg preset "$PRESET" \
-    '{
-      monitor: $mon,
-      enabled: $enabled,
-      sdrBrightness: $sdrB,
-      sdrSaturation: $sdrS,
-      sdrMaxLuminance: $sdrMaxL,
-      cm: $cm,
-      backlightSync: $blSync,
-      preset: $preset
-    }' > "$STATE_FILE" 2>/dev/null || true
+# 3. Update persistent XDG state.json (per-monitor)
+mkdir -p "$STATE_DIR"
+BASE_STATE="{}"
+if [[ -f "$STATE_FILE" ]] && jq -e . "$STATE_FILE" >/dev/null 2>&1; then
+  BASE_STATE=$(cat "$STATE_FILE")
 fi
+
+jq \
+  --arg mon "$MONITOR" \
+  --argjson enabled "$IS_ENABLED" \
+  --argjson sdrB "$SDR_B" \
+  --argjson sdrS "$SDR_S" \
+  --argjson sdrMaxL "$SDR_MAX_L" \
+  --arg cm "$CM_PRESET" \
+  --argjson blSync "$BL_SYNC" \
+  --arg preset "$PRESET" \
+  --argjson scale "$SCALE" \
+  --argjson edidMinL "$EDID_MIN_L" \
+  --argjson edidMaxL "$EDID_MAX_L" \
+  --argjson edidAvgL "$EDID_AVG_L" \
+  --argjson ct "$COLOR_TEMP" \
+  '
+  .colorTemp = $ct |
+  .monitors = (.monitors // {}) |
+  .monitors[$mon] = {
+    enabled: $enabled,
+    sdrBrightness: $sdrB,
+    sdrSaturation: $sdrS,
+    sdrMaxLuminance: $sdrMaxL,
+    cm: $cm,
+    backlightSync: $blSync,
+    preset: $preset,
+    scale: $scale,
+    edidMinLuminance: $edidMinL,
+    edidMaxLuminance: $edidMaxL,
+    edidAvgLuminance: $edidAvgL
+  }
+  ' <<<"$BASE_STATE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
 
 # 4. Apply live via Hyprland IPC
 if [[ "$IS_ENABLED" == "true" ]]; then
   hyprctl eval "hl.monitor({ output = \"$MONITOR\", mode = \"preferred\", position = \"auto\", scale = $SCALE, bitdepth = 10, cm = \"$CM_PRESET\", sdrbrightness = $SDR_B, sdrsaturation = $SDR_S, sdr_min_luminance = $EDID_MIN_L, sdr_max_luminance = $SDR_MAX_L, min_luminance = $EDID_MIN_L, max_luminance = $EDID_MAX_L, max_avg_luminance = $EDID_AVG_L })" >/dev/null 2>&1 || true
 
-  # Notification for explicit toggle / preset
   if [[ "$ACTION" == "toggle" || "$ACTION" == "on" || "$ACTION" == "preset" ]]; then
-    command -v notify-send >/dev/null 2>&1 && notify-send -a "Omarchy HDR" -i "video-display" -h string:x-canonical-private-synchronous:hdr-status "Affichage HDR" "HDR Activé ($CM_PRESET • ${SDR_MAX_L} nits)" 2>/dev/null || true
+    notify_hdr "Affichage HDR ($MONITOR)" "HDR Activé ($CM_PRESET • ${SDR_MAX_L} nits • ${COLOR_TEMP}K)"
   fi
 else
   hyprctl eval "hl.monitor({ output = \"$MONITOR\", mode = \"preferred\", position = \"auto\", scale = $SCALE, bitdepth = 10, cm = \"srgb\", sdrbrightness = 1.0, sdrsaturation = 1.0, sdr_min_luminance = $EDID_MIN_L, sdr_max_luminance = $EDID_AVG_L, min_luminance = $EDID_MIN_L, max_luminance = $EDID_MAX_L })" >/dev/null 2>&1 || true
 
   if [[ "$ACTION" == "toggle" || "$ACTION" == "off" || "$ACTION" == "preset" ]]; then
-    command -v notify-send >/dev/null 2>&1 && notify-send -a "Omarchy HDR" -i "video-display" -h string:x-canonical-private-synchronous:hdr-status "Affichage HDR" "Mode SDR Standard activé" 2>/dev/null || true
+    notify_hdr "Affichage HDR ($MONITOR)" "Mode SDR Standard activé"
   fi
 fi
 
-# 5. Generate ~/.config/hypr/hdr.lua dynamically for persistence
+# 5. Generate ~/.config/hypr/hdr.lua for all configured monitors (without clobbering global hl.config)
 if [[ -w "$HDR_CONF" ]] || [[ ! -e "$HDR_CONF" && -w "$(dirname "$HDR_CONF")" ]]; then
-cat << LUA_EOF > "$HDR_CONF"
--- HDR & Color Management Configuration for Omarchy / Hyprland
--- Auto-generated by vedix.hdr plugin
+  {
+    echo "-- HDR & Color Management Configuration for Omarchy / Hyprland"
+    echo "-- Auto-generated by vedix.hdr plugin"
+    echo ""
 
-hl.config({
-  quirks = {
-    skip_non_kms_dmabuf_formats = true,
-  },
-})
-
+    # Emit one hl.monitor block per saved monitor
+    while IFS=$'\t' read -r m_name m_enabled m_scale m_cm m_sdrb m_sdrs m_sdrmax m_minl m_maxl m_avgl m_blsync; do
+      if [[ "$m_enabled" == "true" ]]; then
+        cat << LUA_EOF
 hl.monitor({
-  output = "",
+  output = "$m_name",
   mode = "preferred",
   position = "auto",
-  scale = "auto",
-})
-
-LUA_EOF
-
-if [[ "$IS_ENABLED" == "true" ]]; then
-  cat << LUA_EOF >> "$HDR_CONF"
-hl.monitor({
-  output = "$MONITOR",
-  mode = "preferred",
-  position = "auto",
-  scale = $SCALE,
+  scale = $m_scale,
   bitdepth = 10,
-  cm = "$CM_PRESET",
-  sdrbrightness = $SDR_B,
-  sdrsaturation = $SDR_S,
-  sdr_min_luminance = $EDID_MIN_L,
-  sdr_max_luminance = $SDR_MAX_L,
-  min_luminance = $EDID_MIN_L,
-  max_luminance = $EDID_MAX_L,
-  max_avg_luminance = $EDID_AVG_L,
+  cm = "$m_cm",
+  sdrbrightness = $m_sdrb,
+  sdrsaturation = $m_sdrs,
+  sdr_min_luminance = $m_minl,
+  sdr_max_luminance = $m_sdrmax,
+  min_luminance = $m_minl,
+  max_luminance = $m_maxl,
+  max_avg_luminance = $m_avgl,
 })
 
 LUA_EOF
-
-  if [[ "$BL_SYNC" == "true" ]]; then
-    cat << LUA_EOF >> "$HDR_CONF"
--- Dynamic Backlight Sync (Tracking physical brightness key adjustments)
+        if [[ "$m_blsync" == "true" && "$m_name" == eDP* ]]; then
+          cat << LUA_EOF
+-- Dynamic Backlight Sync for $m_name
 local function get_backlight_paths()
   local p = io.popen("ls -1 /sys/class/backlight 2>/dev/null")
   if not p then return nil, nil end
@@ -236,7 +340,7 @@ end
 
 local bl_max = read_num(bl_max_path) or 400000
 local last_bl = nil
-local target_mon = "$MONITOR"
+local target_mon = "$m_name"
 
 local function sync_hdr_brightness()
   local cur = read_num(bl_path)
@@ -244,9 +348,9 @@ local function sync_hdr_brightness()
   last_bl = cur
 
   local ratio = math.max(0.01, math.min(1.0, cur / bl_max))
-  local sdr_b = tonumber(string.format("%.3f", 0.10 + ratio * (${SDR_B} - 0.10)))
+  local sdr_b = tonumber(string.format("%.3f", 0.10 + ratio * (${m_sdrb} - 0.10)))
   local mon = hl.get_monitor(target_mon)
-  local scale = (mon and mon.scale) or $SCALE
+  local scale = (mon and mon.scale) or $m_scale
 
   hl.monitor({
     output = target_mon,
@@ -254,42 +358,56 @@ local function sync_hdr_brightness()
     position = "auto",
     scale = scale,
     bitdepth = 10,
-    cm = "$CM_PRESET",
+    cm = "$m_cm",
     sdrbrightness = sdr_b,
-    sdrsaturation = $SDR_S,
-    sdr_min_luminance = $EDID_MIN_L,
-    sdr_max_luminance = $SDR_MAX_L,
-    min_luminance = $EDID_MIN_L,
-    max_luminance = $EDID_MAX_L,
-    max_avg_luminance = $EDID_AVG_L,
+    sdrsaturation = $m_sdrs,
+    sdr_min_luminance = $m_minl,
+    sdr_max_luminance = $m_sdrmax,
+    min_luminance = $m_minl,
+    max_luminance = $m_maxl,
+    max_avg_luminance = $m_avgl,
   })
 end
 
 sync_hdr_brightness()
-hl.timer(sync_hdr_brightness, { timeout = 100, type = "repeat" })
-LUA_EOF
-  fi
+hl.timer(sync_hdr_brightness, { timeout = 250, type = "repeat" })
 
-else
-  cat << LUA_EOF >> "$HDR_CONF"
--- SDR Calibrated Mode
+LUA_EOF
+        fi
+      else
+        cat << LUA_EOF
+-- SDR Calibrated Mode for $m_name
 hl.monitor({
-  output = "$MONITOR",
+  output = "$m_name",
   mode = "preferred",
   position = "auto",
-  scale = $SCALE,
+  scale = $m_scale,
   bitdepth = 10,
   cm = "srgb",
   sdrbrightness = 1.0,
   sdrsaturation = 1.0,
-  sdr_min_luminance = $EDID_MIN_L,
-  sdr_max_luminance = $EDID_AVG_L,
-  min_luminance = $EDID_MIN_L,
-  max_luminance = $EDID_MAX_L,
+  sdr_min_luminance = $m_minl,
+  sdr_max_luminance = $m_avgl,
+  min_luminance = $m_minl,
+  max_luminance = $m_maxl,
 })
-LUA_EOF
-fi
 
-fi # end if writable
+LUA_EOF
+      fi
+    done < <(jq -r '.monitors | to_entries[] | [
+      .key,
+      (.value.enabled // true),
+      (.value.scale // 1.0),
+      (.value.cm // "hdr"),
+      (.value.sdrBrightness // 1.80),
+      (.value.sdrSaturation // 1.15),
+      (.value.sdrMaxLuminance // 617),
+      (.value.edidMinLuminance // 0.005),
+      (.value.edidMaxLuminance // 617),
+      (.value.edidAvgLuminance // 400),
+      (.value.backlightSync // true)
+    ] | @tsv' "$STATE_FILE")
+  } > "$HDR_CONF"
+fi
 
 exit 0
