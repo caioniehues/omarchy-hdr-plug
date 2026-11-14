@@ -144,14 +144,13 @@ case "$ACTION" in
   sdr_max_lum) [[ -n "$PARAM" ]] && SDR_MAX_L="$PARAM"; PRESET="custom" ;;
   cm) [[ -n "$PARAM" ]] && CM_PRESET="$PARAM"; PRESET="custom" ;;
   preset)
-    #               enabled b    s    sdr-white     cm     temp
+    white=$(jq -r '.presetSdrWhite' <<<"$CURRENT_JSON")
+    #             enabled b   s  sdr-white cm   temp
     case "$PARAM" in
-      vivid)      set -- true  1.80 1.15 "$EDID_MAX_L" hdr   6500 ;;
-      cinema_hdr) set -- true  1.10 1.00 "$EDID_MAX_L" hdr   5800 ;;
-      cinema)     set -- true  1.00 1.00 "$EDID_MAX_L" dcip3 5800 ;;
-      outdoor)    set -- true  2.00 1.20 "$EDID_MAX_L" hdr   6500 ;;
-      eco)        set -- false 1.00 1.00 "$EDID_AVG_L" srgb  6500 ;;
-      optimal)    set -- true  1.40 1.00 "$EDID_AVG_L" hdr   6500 ;;
+      desktop) set -- true  1   1  "$white" hdr  6500 ;;
+      bright)  set -- true  1.2 1  "$white" hdr  6500 ;;
+      cinema)  set -- true  1   1  200      hdr  6500 ;;
+      sdr)     set -- false 1   1  "$white" srgb 6500 ;;
       *) echo "omarchy-hdr-set: unknown preset '$PARAM'" >&2; exit 2 ;;
     esac
     IS_ENABLED=$1 SDR_B=$2 SDR_S=$3 SDR_MAX_L=$4 CM_PRESET=$5 PRESET="$PARAM"

@@ -21,19 +21,19 @@ Panel {
   property string monitor: ""
   property string monitorName: "Display"
   property var monitors: []
-  property real sdrBrightness: 1.80
-  property real sdrSaturation: 1.15
+  property real sdrBrightness: 1.0
+  property real sdrSaturation: 1.0
   property real sdrMaxLum: 300
   property real edidMaxLum: 300
   property real edidAvgLum: 250
   property real edidMinLum: 0.05
   property string cmPreset: "hdr"
-  property string currentPreset: "vivid"
+  property string currentPreset: "desktop"
   property real colorTemp: 6500
   property real pendingTemp: 6500
   property real pendingSdrMaxLum: 300
-  property real pendingSdrBrightness: 1.80
-  property real pendingSdrSaturation: 1.15
+  property real pendingSdrBrightness: 1.0
+  property real pendingSdrSaturation: 1.0
   property bool showAdvanced: true
 
   readonly property color panelForeground: root.bar ? root.bar.foreground : Commons.Color.foreground
@@ -122,8 +122,8 @@ Panel {
           root.monitorName = data.monitorName || root.monitor
           root.monitors = Array.isArray(data.monitors) ? data.monitors : []
           if (!sliderDebounce.running) {
-            root.sdrBrightness = data.sdrBrightness !== undefined ? data.sdrBrightness : 1.80
-            root.sdrSaturation = data.sdrSaturation !== undefined ? data.sdrSaturation : 1.15
+            root.sdrBrightness = data.sdrBrightness !== undefined ? data.sdrBrightness : 1.0
+            root.sdrSaturation = data.sdrSaturation !== undefined ? data.sdrSaturation : 1.0
             root.sdrMaxLum = data.sdrMaxLuminance !== undefined ? data.sdrMaxLuminance : 300
           }
           root.edidMaxLum = data.edidMaxLuminance !== undefined ? data.edidMaxLuminance : 300
@@ -316,28 +316,22 @@ Panel {
             width: parent.width
             spacing: Style.space(6)
             Button {
-              text: strings.t("preset_vivid")
+              text: strings.t("preset_desktop")
               bordered: true
-              selected: root.hdrEnabled && root.currentPreset === "vivid"
-              onClicked: root.applyPreset("vivid")
+              selected: root.hdrEnabled && root.currentPreset === "desktop"
+              onClicked: root.applyPreset("desktop")
             }
             Button {
-              text: strings.t("preset_cinema_hdr")
+              text: strings.t("preset_bright")
               bordered: true
-              selected: root.hdrEnabled && root.currentPreset === "cinema_hdr"
-              onClicked: root.applyPreset("cinema_hdr")
+              selected: root.hdrEnabled && root.currentPreset === "bright"
+              onClicked: root.applyPreset("bright")
             }
             Button {
-              text: strings.t("preset_outdoor")
+              text: strings.t("preset_cinema")
               bordered: true
-              selected: root.hdrEnabled && root.currentPreset === "outdoor"
-              onClicked: root.applyPreset("outdoor")
-            }
-            Button {
-              text: strings.t("optimal_edid")
-              bordered: true
-              selected: root.hdrEnabled && root.currentPreset === "optimal"
-              onClicked: root.applyPreset("optimal")
+              selected: root.hdrEnabled && root.currentPreset === "cinema"
+              onClicked: root.applyPreset("cinema")
             }
           }
         }
@@ -352,16 +346,10 @@ Panel {
             width: parent.width
             spacing: Style.space(6)
             Button {
-              text: strings.t("preset_cinema")
+              text: strings.t("preset_sdr")
               bordered: true
-              selected: root.currentPreset === "cinema"
-              onClicked: root.applyPreset("cinema")
-            }
-            Button {
-              text: strings.t("preset_eco")
-              bordered: true
-              selected: !root.hdrEnabled && root.currentPreset === "eco"
-              onClicked: root.applyPreset("eco")
+              selected: !root.hdrEnabled && root.currentPreset === "sdr"
+              onClicked: root.applyPreset("sdr")
             }
           }
         }

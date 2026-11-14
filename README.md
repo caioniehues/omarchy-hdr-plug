@@ -11,8 +11,16 @@ Omarchy bar plugin to control HDR, color profiles and color temperature under Hy
   - Detects the monitor, its EDID HDR capabilities (max luminance in nits), and supports multiple monitors (`Dropdown`).
   - HDR on/off switch and hardware rescan button (`󰑐`).
   - Color temperature slider (3000–9000 K) driven by `hyprsunset`, debounced.
-  - HDR modes: `Vivid HDR`, `Cinema HDR`, `Outdoor`, `Optimal EDID`.
-  - SDR modes: `Cinema (P3)`, `Design (sRGB)`.
+  - Presets tuned for OLED, derived from the EDID (SDR white = frame-average luminance rounded to 10 nits, 250 on the Odyssey G95SC):
+
+    | Preset | HDR | SDR white | SDR boost | Saturation |
+    |---|---|---|---|---|
+    | `HDR Desktop` (default) | on | frame-average | 1.0 | 1.0 |
+    | `HDR Bright` | on | frame-average | 1.2 | 1.0 |
+    | `HDR Cinema` | on | 200 nits | 1.0 | 1.0 |
+    | `SDR` | off (sRGB) | – | – | – |
+
+    White stays at the frame-average so full-screen white doesn't trigger the panel's brightness limiter (ABL). Highlights use the EDID peak.
   - Color space selector (HDR / DCI-P3 / sRGB) and sliders for target SDR luminance, SDR brightness boost and SDR saturation.
   - **Reset** button with a confirmation dialog to restore the native display settings.
 - **XDG persistence**: per-monitor state (keyed by monitor description) in `~/.local/state/caioniehues.hdr/state.json`; generated Hyprland config in `~/.config/hypr/hdr.lua`.
@@ -53,7 +61,7 @@ To remove the plugin completely and restore the system as if it had never been i
 - `bin/omarchy-hdr-set [--monitor <connector|description>] <action> [param...]`:
   - `toggle`, `on`, `off`
   - `temperature <3000..9000>`
-  - `preset vivid|cinema_hdr|cinema|outdoor|eco|optimal`
+  - `preset desktop|bright|cinema|sdr`
   - `sdr_brightness <val>`, `sdr_saturation <val>`, `sdr_max_lum <nits>`
   - `cm <preset>`
   - `apply <brightness> <saturation> <max_luminance> <cm>`

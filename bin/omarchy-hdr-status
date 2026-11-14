@@ -58,6 +58,9 @@ jq -n \
   --argjson edidAvg "$EDID_AVG_L" \
   --argjson edidMin "$EDID_MIN_L" '
   def or_default($d): if . == null then $d else . end;
+  # SDR white for presets: the EDID frame-average (what an OLED sustains full-screen), rounded to 10 nits.
+  # Unconfigured monitors start on the desktop/sdr preset values.
+  (($edidAvg / 10 | round) * 10) as $white |
   ($state.monitors[$mon.description] // {}) as $s |
   {
     monitor: $mon.name,
@@ -65,14 +68,15 @@ jq -n \
     monitorName: $mon.description,
     hdrCapable: $hdrCapable,
     enabled: ($s.enabled | or_default($mon.colorManagementPreset == "hdr")),
-    sdrBrightness: ($s.sdrBrightness | or_default(1.80)),
-    sdrSaturation: ($s.sdrSaturation | or_default(1.15)),
-    sdrMaxLuminance: ($s.sdrMaxLuminance | or_default($edidMax)),
+    sdrBrightness: ($s.sdrBrightness | or_default(1)),
+    sdrSaturation: ($s.sdrSaturation | or_default(1)),
+    sdrMaxLuminance: ($s.sdrMaxLuminance | or_default($white)),
     edidMaxLuminance: $edidMax,
     edidAvgLuminance: $edidAvg,
     edidMinLuminance: $edidMin,
+    presetSdrWhite: $white,
     cm: ($s.cm | or_default(if $hdrCapable then "hdr" else "srgb" end)),
-    preset: ($s.preset | or_default(if $hdrCapable then "vivid" else "eco" end)),
+    preset: ($s.preset | or_default(if $hdrCapable then "desktop" else "sdr" end)),
     colorTemp: ($state.colorTemp | or_default(6500)),
     monitors: [$monitors[] | {name, description, focused: (.focused // false)}]
   }'
