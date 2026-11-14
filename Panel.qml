@@ -348,7 +348,7 @@ Panel {
             Button {
               text: strings.t("preset_sdr")
               bordered: true
-              selected: !root.hdrEnabled && root.currentPreset === "sdr"
+              selected: !root.hdrEnabled
               onClicked: root.applyPreset("sdr")
             }
           }

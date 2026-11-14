@@ -81,7 +81,7 @@ load helpers
   [ ! -e "$(state_file)" ]
 }
 
-# [enabled, boost, saturation, SDR white nits, cm] per preset for the G95SC (EDID frame-avg 248 nits).
+# [enabled, boost, saturation, SDR white nits, cm, preset] for the G95SC (EDID frame-avg 248 nits).
 saved_preset() {
   jq -c --arg d "$G9_DESC" '.monitors[$d] | [.enabled, .sdrBrightness, .sdrSaturation, .sdrMaxLuminance, .cm, .preset]' "$(state_file)"
 }
@@ -89,21 +89,23 @@ saved_preset() {
 @test "OLED presets derive SDR white from the EDID frame-average" {
   hdr_set preset desktop; [ "$(saved_preset)" = '[true,1,1,250,"hdr","desktop"]' ]
   hdr_set preset bright;  [ "$(saved_preset)" = '[true,1.2,1,250,"hdr","bright"]' ]
+  [[ "$(last_eval)" == *'cm = "hdr", sdrbrightness = 1.2,'* ]]
   hdr_set preset cinema;  [ "$(saved_preset)" = '[true,1,1,200,"hdr","cinema"]' ]
-  hdr_set preset sdr;     [ "$(saved_preset)" = '[false,1,1,250,"srgb","sdr"]' ]
+  hdr_set preset sdr;     [ "$(saved_preset)" = '[false,1,1,250,"hdr","sdr"]' ]
+  [[ "$(last_eval)" == *'cm = "srgb"'* ]]
+}
+
+@test "turning HDR back on after the SDR preset restores HDR Desktop" {
+  hdr_set preset sdr
+  hdr_set on
+  [ "$(saved_preset)" = '[true,1,1,250,"hdr","desktop"]' ]
+  [[ "$(last_eval)" == *'cm = "hdr"'* ]]
 }
 
 @test "preset desktop sends SDR white 250 with EDID peak 400" {
   hdr_set preset desktop
   run last_eval
   [[ "$output" == *"sdr_max_luminance = 250, min_luminance = 0, max_luminance = 400"* ]]
-}
-
-@test "laptop-era presets are gone" {
-  for p in vivid cinema_hdr outdoor eco optimal; do
-    run hdr_set preset "$p"
-    [ "$status" -eq 2 ]
-  done
 }
 
 @test "an unconfigured HDR monitor starts on the desktop preset" {

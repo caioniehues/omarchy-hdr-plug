@@ -129,9 +129,15 @@ fi
 
 # 2. Apply the action to the in-memory settings
 case "$ACTION" in
-  toggle) IS_ENABLED=$([[ "$IS_ENABLED" == "true" ]] && echo "false" || echo "true") ;;
-  on) IS_ENABLED="true" ;;
-  off) IS_ENABLED="false" ;;
+  toggle|on|off)
+    case "$ACTION" in
+      toggle) IS_ENABLED=$([[ "$IS_ENABLED" == "true" ]] && echo "false" || echo "true") ;;
+      on) IS_ENABLED="true" ;;
+      off) IS_ENABLED="false" ;;
+    esac
+    # The SDR preset has desktop values with HDR off, so switching HDR on lands on desktop.
+    [[ "$IS_ENABLED" == "true" && "$PRESET" == "sdr" ]] && PRESET="desktop"
+    ;;
   apply)
     [[ -n "$PARAM" ]] && SDR_B="$PARAM"
     [[ -n "$EXTRA" ]] && SDR_S="$EXTRA"
@@ -144,17 +150,18 @@ case "$ACTION" in
   sdr_max_lum) [[ -n "$PARAM" ]] && SDR_MAX_L="$PARAM"; PRESET="custom" ;;
   cm) [[ -n "$PARAM" ]] && CM_PRESET="$PARAM"; PRESET="custom" ;;
   preset)
-    white=$(jq -r '.presetSdrWhite' <<<"$CURRENT_JSON")
-    #             enabled b   s  sdr-white cm   temp
+    SDR_WHITE=$(jq -r '.presetSdrWhite' <<<"$CURRENT_JSON")
+    # All presets use cm=hdr, saturation 1, 6500 K; sdr sends srgb only because it disables HDR.
+    #             enabled boost sdr-white
     case "$PARAM" in
-      desktop) set -- true  1   1  "$white" hdr  6500 ;;
-      bright)  set -- true  1.2 1  "$white" hdr  6500 ;;
-      cinema)  set -- true  1   1  200      hdr  6500 ;;
-      sdr)     set -- false 1   1  "$white" srgb 6500 ;;
+      desktop) set -- true  1     "$SDR_WHITE" ;;
+      bright)  set -- true  1.2   "$SDR_WHITE" ;;
+      cinema)  set -- true  1     200 ;;
+      sdr)     set -- false 1     "$SDR_WHITE" ;;
       *) echo "omarchy-hdr-set: unknown preset '$PARAM'" >&2; exit 2 ;;
     esac
-    IS_ENABLED=$1 SDR_B=$2 SDR_S=$3 SDR_MAX_L=$4 CM_PRESET=$5 PRESET="$PARAM"
-    COLOR_TEMP=$(apply_color_temp "$6")
+    IS_ENABLED=$1 SDR_B=$2 SDR_S=1 SDR_MAX_L=$3 CM_PRESET=hdr PRESET="$PARAM"
+    COLOR_TEMP=$(apply_color_temp 6500)
     ;;
   *) echo "omarchy-hdr-set: unknown action '$ACTION'" >&2; exit 2 ;;
 esac
