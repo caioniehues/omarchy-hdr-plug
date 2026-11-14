@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Installer / Uninstaller for Omarchy HDR Control Plugin (vedix.hdr)
+# Installer / Uninstaller for Omarchy HDR Control Plugin (caioniehues.hdr)
 # ==============================================================================
 set -euo pipefail
 
@@ -12,8 +12,9 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET_DIR="$HOME/.config/omarchy/plugins/vedix.hdr"
-STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/vedix.hdr"
+PLUGIN_ID="caioniehues.hdr"
+TARGET_DIR="$HOME/.config/omarchy/plugins/$PLUGIN_ID"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/$PLUGIN_ID"
 HYPR_CONF="$HOME/.config/hypr/hyprland.lua"
 HDR_CONF="$HOME/.config/hypr/hdr.lua"
 SHELL_CONF="$HOME/.config/omarchy/shell.json"
@@ -31,25 +32,25 @@ uninstall_plugin() {
 
   # 2. Remove from Hyprland config
   if [[ -f "$HYPR_CONF" ]]; then
-    sed -i '/require("hypr\.hdr")/d' "$HYPR_CONF"
+    sed -i '/require.*"hypr\.hdr"/d' "$HYPR_CONF"
     echo -e "${GREEN}✓ Référence hypr.hdr retirée de $HYPR_CONF.${NC}"
   fi
 
   # 3. Unregister from Omarchy plugins & shell.json
   if command -v omarchy >/dev/null 2>&1; then
-    omarchy plugin remove vedix.hdr --yes >/dev/null 2>&1 || true
+    omarchy plugin remove "$PLUGIN_ID" --yes >/dev/null 2>&1 || true
   fi
 
   if [[ -f "$SHELL_CONF" ]] && command -v jq >/dev/null 2>&1; then
     local tmp_json
     tmp_json=$(mktemp)
-    jq '
-      .plugins = ((.plugins // []) | map(select(.id != "vedix.hdr"))) |
-      .bar.layout.right = ((.bar.layout.right // []) | map(select(.id != "vedix.hdr"))) |
-      .bar.layout.left = ((.bar.layout.left // []) | map(select(.id != "vedix.hdr"))) |
-      .bar.layout.center = ((.bar.layout.center // []) | map(select(.id != "vedix.hdr")))
+    jq --arg id "$PLUGIN_ID" '
+      .plugins = ((.plugins // []) | map(select(.id != $id))) |
+      .bar.layout.right = ((.bar.layout.right // []) | map(select(.id != $id))) |
+      .bar.layout.left = ((.bar.layout.left // []) | map(select(.id != $id))) |
+      .bar.layout.center = ((.bar.layout.center // []) | map(select(.id != $id)))
     ' "$SHELL_CONF" > "$tmp_json" && mv "$tmp_json" "$SHELL_CONF"
-    echo -e "${GREEN}✓ Entrée vedix.hdr retirée de $SHELL_CONF.${NC}"
+    echo -e "${GREEN}✓ Entrée $PLUGIN_ID retirée de $SHELL_CONF.${NC}"
   fi
 
   # 4. Remove plugin directory
@@ -93,7 +94,7 @@ else
   echo -e "${GREEN}✓ Dépendances satisfaites (edid-decode, jq, hyprsunset).${NC}"
 fi
 
-# 2. Copie du plugin dans ~/.config/omarchy/plugins/vedix.hdr
+# 2. Copie du plugin dans ~/.config/omarchy/plugins/caioniehues.hdr
 echo -e "\n${BLUE}2. Installation des fichiers du plugin...${NC}"
 mkdir -p "$TARGET_DIR/bin" "$TARGET_DIR/i18n"
 
@@ -140,20 +141,20 @@ echo -e "${GREEN}✓ Configuration générée dans ~/.config/hypr/hdr.lua.${NC}"
 
 # 5. Enregistrement natif dans les plugins Omarchy
 echo -e "\n${BLUE}5. Enregistrement dans les plugins Omarchy...${NC}"
-if command -v omarchy >/dev/null 2>&1 && omarchy plugin enable vedix.hdr right >/dev/null 2>&1; then
+if command -v omarchy >/dev/null 2>&1 && omarchy plugin enable "$PLUGIN_ID" right >/dev/null 2>&1; then
   echo -e "${GREEN}✓ Plugin activé via omarchy plugin enable.${NC}"
 elif [[ -f "$SHELL_CONF" ]]; then
   TMP_JSON=$(mktemp)
-  jq '
-    .plugins = ([{"id": "vedix.hdr"}] + (.plugins // [] | map(select(.id != "vedix.hdr")))) |
-    if (.bar.layout.right | map(.id) | index("vedix.hdr")) == null then
+  jq --arg id "$PLUGIN_ID" '
+    .plugins = ([{"id": $id}] + (.plugins // [] | map(select(.id != $id)))) |
+    if (.bar.layout.right | map(.id) | index($id)) == null then
       .bar.layout.right = (
         .bar.layout.right as $r |
         ($r | map(.id) | index("omarchy.tray")) as $tray_idx |
         if $tray_idx != null then
-          $r[0:$tray_idx+1] + [{"id": "vedix.hdr"}] + $r[$tray_idx+1:]
+          $r[0:$tray_idx+1] + [{"id": $id}] + $r[$tray_idx+1:]
         else
-          [{"id": "vedix.hdr"}] + $r
+          [{"id": $id}] + $r
         end
       )
     else
@@ -172,5 +173,5 @@ fi
 
 echo -e "\n${GREEN}${BOLD}======================================================${NC}"
 echo -e "${GREEN}${BOLD} Installation terminée avec succès !${NC}"
-echo -e "${GREEN}${BOLD} Le plugin vedix.hdr est actif dans Omarchy et la barre.${NC}"
+echo -e "${GREEN}${BOLD} Le plugin $PLUGIN_ID est actif dans Omarchy et la barre.${NC}"
 echo -e "${GREEN}${BOLD}======================================================${NC}"

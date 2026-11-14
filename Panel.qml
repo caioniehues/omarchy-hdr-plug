@@ -8,8 +8,8 @@ import qs.Ui
 
 Panel {
   id: root
-  moduleName: "vedix.hdr"
-  ipcTarget: "vedix.hdr"
+  moduleName: "caioniehues.hdr"
+  ipcTarget: "caioniehues.hdr"
   manageIpc: true
 
   implicitWidth: button.implicitWidth

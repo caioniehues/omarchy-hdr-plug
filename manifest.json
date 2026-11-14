@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "vedix.hdr",
+  "id": "caioniehues.hdr",
   "name": "HDR Control",
   "version": "1.1.0",
-  "author": "vedix",
+  "author": "caioniehues (based on vedix95/omarchy-hdr-plug)",
   "license": "MIT",
   "description": "HDR toggle, color temperature, and display luminance controls for Hyprland",
   "kinds": [

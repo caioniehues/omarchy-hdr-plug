@@ -2,10 +2,8 @@
 # Returns rich JSON status of HDR, EDID capabilities, available monitors, and color controls.
 set -euo pipefail
 
-PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/vedix.hdr"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/caioniehues.hdr"
 STATE_FILE="$STATE_DIR/state.json"
-LEGACY_STATE_FILE="$PLUGIN_DIR/state.json"
 
 RAW_MONITORS=$(hyprctl monitors -j 2>/dev/null || true)
 if [[ -n "$RAW_MONITORS" ]] && jq -e 'type == "array"' <<<"$RAW_MONITORS" >/dev/null 2>&1; then
@@ -91,12 +89,10 @@ if [[ "$MONITORS_JSON" != "[]" ]]; then
   MONITORS_LIST=$(jq -c '[.[] | {name: .name, description: (.description // .name), focused: (.focused // false), scale: (.scale // 1.0)}]' <<<"$MONITORS_JSON" 2>/dev/null || echo "[]")
 fi
 
-# 3. Read persistent user state (per-monitor XDG state with legacy fallback)
+# 3. Read persistent user state (per-monitor XDG state)
 ACTIVE_STATE_FILE=""
 if [[ -f "$STATE_FILE" ]] && jq -e . "$STATE_FILE" >/dev/null 2>&1; then
   ACTIVE_STATE_FILE="$STATE_FILE"
-elif [[ -f "$LEGACY_STATE_FILE" ]] && jq -e . "$LEGACY_STATE_FILE" >/dev/null 2>&1; then
-  ACTIVE_STATE_FILE="$LEGACY_STATE_FILE"
 fi
 
 DEFAULT_ENABLED=$([[ "$HYPR_CM" == "hdr" ]] && echo "true" || echo "false")

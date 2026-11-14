@@ -1,4 +1,6 @@
-# HDR Control (`vedix.hdr`)
+# HDR Control (`caioniehues.hdr`)
+
+Fork of [vedix95/omarchy-hdr-plug](https://github.com/vedix95/omarchy-hdr-plug) by vedix95.
 
 Plugin Omarchy pour piloter l'affichage HDR, les profils colorimétriques et la température de couleur sous Hyprland depuis la barre Omarchy.
 
@@ -12,7 +14,7 @@ Plugin Omarchy pour piloter l'affichage HDR, les profils colorimétriques et la 
   - Modes HDR : `Vivid HDR`, `Cinéma HDR`, `Plein Jour`.
   - Modes SDR : `Cinéma (P3)`, `Design (sRGB)`.
   - Bouton **Réinitialiser** (`reset`) avec dialogue de confirmation pour restaurer l'affichage natif d'origine.
-- **Persistance XDG** : état sauvegardé par moniteur dans `~/.local/state/vedix.hdr/state.json` et configuration Hyprland générée dans `~/.config/hypr/hdr.lua`.
+- **Persistance XDG** : état sauvegardé par moniteur dans `~/.local/state/caioniehues.hdr/state.json` et configuration Hyprland générée dans `~/.config/hypr/hdr.lua`.
 
 ## Dépendances
 

@@ -1,0 +1,25 @@
+[
+  {
+    "id": 1,
+    "name": "DP-2",
+    "description": "Samsung Electric Company Odyssey G95SC H1AK500000",
+    "make": "Samsung Electric Company",
+    "model": "Odyssey G95SC",
+    "serial": "H1AK500000",
+    "width": 5120,
+    "height": 1440,
+    "refreshRate": 239.99899,
+    "x": 0,
+    "y": 0,
+    "scale": 1,
+    "transform": 0,
+    "focused": true,
+    "vrr": false,
+    "currentFormat": "XRGB2101010",
+    "colorManagementPreset": "hdr",
+    "sdrBrightness": 1,
+    "sdrSaturation": 1,
+    "sdrMinLuminance": 0,
+    "sdrMaxLuminance": 250
+  }
+]
