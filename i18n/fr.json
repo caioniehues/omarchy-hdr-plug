@@ -21,6 +21,7 @@
   "sdr_brightness": "Gain Luminosité SDR",
   "sdr_saturation": "Saturation Couleurs SDR",
   "color_gamut": "Espace de Couleurs",
+  "sdr_eotf": "Courbe de Transfert SDR",
   "presets_title": "Profils Rapides",
   "rescan": "Rescan Écran",
   "rescan_tooltip": "Réanalyser le matériel, la dalle et l'EDID",

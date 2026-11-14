@@ -28,6 +28,7 @@ Panel {
   property real edidAvgLum: 250
   property real edidMinLum: 0.05
   property string cmPreset: "hdr"
+  property string sdrEotf: "gamma22"
   property string currentPreset: "desktop"
   property real colorTemp: 6500
   property real pendingTemp: 6500
@@ -130,6 +131,7 @@ Panel {
           root.edidAvgLum = data.edidAvgLuminance !== undefined ? data.edidAvgLuminance : 250
           root.edidMinLum = data.edidMinLuminance !== undefined ? data.edidMinLuminance : 0.05
           root.cmPreset = data.cm || "hdr"
+          root.sdrEotf = data.sdrEotf || "gamma22"
           root.currentPreset = data.preset || "custom"
           if (!tempDebounce.running && data.colorTemp !== undefined) {
             root.colorTemp = data.colorTemp
@@ -382,6 +384,30 @@ Panel {
               bordered: true
               selected: root.cmPreset === "srgb"
               onClicked: root.runAction(["cm", "srgb"])
+            }
+          }
+        }
+
+        // SDR transfer curve used to place SDR content in HDR
+        Column {
+          width: parent.width
+          spacing: Style.space(6)
+          PanelSectionHeader { text: strings.t("sdr_eotf"); foreground: root.panelForeground }
+
+          Flow {
+            width: parent.width
+            spacing: Style.space(6)
+            Button {
+              text: "Gamma 2.2"
+              bordered: true
+              selected: root.sdrEotf === "gamma22"
+              onClicked: root.runAction(["sdr_eotf", "gamma22"])
+            }
+            Button {
+              text: "sRGB"
+              bordered: true
+              selected: root.sdrEotf === "srgb"
+              onClicked: root.runAction(["sdr_eotf", "srgb"])
             }
           }
         }

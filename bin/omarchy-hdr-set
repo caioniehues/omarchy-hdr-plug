@@ -31,7 +31,7 @@ def rule:
   "sdrbrightness = \($c.b), sdrsaturation = \($c.s), " +
   "sdr_min_luminance = \(.edidMinLuminance), sdr_max_luminance = \(.sdrMaxLuminance), " +
   "min_luminance = \(.edidMinLuminance), max_luminance = \(.edidMaxLuminance), " +
-  "max_avg_luminance = \(.edidAvgLuminance) })";'
+  "max_avg_luminance = \(.edidAvgLuminance), sdr_eotf = \(.sdrEotf | tojson) })";'
 
 notify_hdr() {
   if command -v notify-send >/dev/null 2>&1; then
@@ -116,6 +116,7 @@ SDR_B=$(jq -r '.sdrBrightness' <<<"$CURRENT_JSON")
 SDR_S=$(jq -r '.sdrSaturation' <<<"$CURRENT_JSON")
 SDR_MAX_L=$(jq -r '.sdrMaxLuminance' <<<"$CURRENT_JSON")
 CM_PRESET=$(jq -r '.cm' <<<"$CURRENT_JSON")
+SDR_EOTF=$(jq -r '.sdrEotf' <<<"$CURRENT_JSON")
 PRESET=$(jq -r '.preset' <<<"$CURRENT_JSON")
 COLOR_TEMP=$(jq -r '.colorTemp' <<<"$CURRENT_JSON")
 
@@ -149,9 +150,10 @@ case "$ACTION" in
   sdr_saturation) [[ -n "$PARAM" ]] && SDR_S="$PARAM"; PRESET="custom" ;;
   sdr_max_lum) [[ -n "$PARAM" ]] && SDR_MAX_L="$PARAM"; PRESET="custom" ;;
   cm) [[ -n "$PARAM" ]] && CM_PRESET="$PARAM"; PRESET="custom" ;;
+  sdr_eotf) [[ -n "$PARAM" ]] && SDR_EOTF="$PARAM"; PRESET="custom" ;;
   preset)
     SDR_WHITE=$(jq -r '.presetSdrWhite' <<<"$CURRENT_JSON")
-    # All presets use cm=hdr, saturation 1, 6500 K; sdr sends srgb only because it disables HDR.
+    # All presets use cm=hdr, saturation 1, gamma 2.2, 6500 K; sdr sends srgb only because it disables HDR.
     #             enabled boost sdr-white
     case "$PARAM" in
       desktop) set -- true  1     "$SDR_WHITE" ;;
@@ -160,7 +162,7 @@ case "$ACTION" in
       sdr)     set -- false 1     "$SDR_WHITE" ;;
       *) echo "omarchy-hdr-set: unknown preset '$PARAM'" >&2; exit 2 ;;
     esac
-    IS_ENABLED=$1 SDR_B=$2 SDR_S=1 SDR_MAX_L=$3 CM_PRESET=hdr PRESET="$PARAM"
+    IS_ENABLED=$1 SDR_B=$2 SDR_S=1 SDR_MAX_L=$3 CM_PRESET=hdr SDR_EOTF=gamma22 PRESET="$PARAM"
     COLOR_TEMP=$(apply_color_temp 6500)
     ;;
   *) echo "omarchy-hdr-set: unknown action '$ACTION'" >&2; exit 2 ;;
@@ -174,6 +176,10 @@ case "$CM_PRESET" in
   auto|srgb|dcip3|dp3|adobe|wide|edid|hdr|hdredid) ;;
   *) echo "omarchy-hdr-set: unknown color space '$CM_PRESET'" >&2; exit 2 ;;
 esac
+case "$SDR_EOTF" in
+  gamma22|srgb) ;;
+  *) echo "omarchy-hdr-set: unknown SDR EOTF '$SDR_EOTF' (gamma22|srgb)" >&2; exit 2 ;;
+esac
 
 STATE=$(read_state | jq \
   --arg desc "$DESC" \
@@ -182,6 +188,7 @@ STATE=$(read_state | jq \
   --argjson sdrS "$SDR_S" \
   --argjson sdrMaxL "$SDR_MAX_L" \
   --arg cm "$CM_PRESET" \
+  --arg sdrEotf "$SDR_EOTF" \
   --arg preset "$PRESET" \
   --argjson edidMinL "$EDID_MIN_L" \
   --argjson edidMaxL "$EDID_MAX_L" \
@@ -194,6 +201,7 @@ STATE=$(read_state | jq \
     sdrSaturation: $sdrS,
     sdrMaxLuminance: $sdrMaxL,
     cm: $cm,
+    sdrEotf: $sdrEotf,
     preset: $preset,
     edidMinLuminance: $edidMinL,
     edidMaxLuminance: $edidMaxL,
@@ -201,9 +209,11 @@ STATE=$(read_state | jq \
   }')
 write_state <<<"$STATE"
 
-# 4. Apply live
-RULE=$(jq -r --arg desc "$DESC" "$RULE_JQ"' .monitors[$desc] + {desc: $desc} | rule' <<<"$STATE")
-hyprctl eval "$RULE" >/dev/null 2>&1 || true
+# 4. Apply live. Hyprland's rule compare ignores vrr/sdr_eotf and applies them on the *next* rule
+# change, so send the rule once with SDR white nudged by 1 nit, then the real rule.
+SAVED=$(jq -c --arg desc "$DESC" '.monitors[$desc] + {desc: $desc}' <<<"$STATE")
+hyprctl eval "$(jq -r "$RULE_JQ"' .sdrMaxLuminance += 1 | rule' <<<"$SAVED")" >/dev/null 2>&1 || true
+hyprctl eval "$(jq -r "$RULE_JQ"' rule' <<<"$SAVED")" >/dev/null 2>&1 || true
 
 if [[ "$IS_ENABLED" == "true" ]]; then
   [[ "$ACTION" =~ ^(toggle|on|preset)$ ]] &&

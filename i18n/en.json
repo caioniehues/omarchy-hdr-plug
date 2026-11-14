@@ -21,6 +21,7 @@
   "sdr_brightness": "SDR Brightness Boost",
   "sdr_saturation": "SDR Color Saturation",
   "color_gamut": "Color Space",
+  "sdr_eotf": "SDR Transfer Curve",
   "presets_title": "Quick Presets",
   "rescan": "Rescan Display",
   "rescan_tooltip": "Rescan hardware capabilities, display and EDID",

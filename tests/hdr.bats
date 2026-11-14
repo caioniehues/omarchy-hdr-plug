@@ -112,3 +112,28 @@ saved_preset() {
   run hdr_status
   [ "$(jq -c '[.preset, .sdrBrightness, .sdrSaturation, .sdrMaxLuminance, .cm]' <<<"$output")" = '["desktop",1,1,250,"hdr"]' ]
 }
+
+@test "SDR EOTF defaults to gamma 2.2 and can switch to sRGB" {
+  hdr_set on
+  [[ "$(last_eval)" == *'sdr_eotf = "gamma22"'* ]]
+  hdr_set sdr_eotf srgb
+  [[ "$(last_eval)" == *'sdr_eotf = "srgb"'* ]]
+  grep -q 'sdr_eotf = "srgb"' "$(hdr_lua)"
+  run hdr_status
+  [ "$(jq -r .sdrEotf <<<"$output")" = srgb ]
+}
+
+@test "an unknown SDR EOTF is rejected" {
+  run hdr_set sdr_eotf pq
+  [ "$status" -ne 0 ]
+  [ -z "$(last_eval)" ]
+}
+
+@test "changes are applied with a one-nit nudge so Hyprland re-evaluates the rule" {
+  # Hyprland's rule compare ignores vrr/sdr_eotf; a soft change forces re-application.
+  hdr_set on
+  run grep '^eval ' "$HYPRCTL_LOG"
+  [ "${#lines[@]}" -eq 2 ]
+  [[ "${lines[0]}" == *"sdr_max_luminance = 251,"* ]]
+  [[ "${lines[1]}" == *"sdr_max_luminance = 250,"* ]]
+}
