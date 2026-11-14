@@ -22,7 +22,8 @@ Omarchy bar plugin to control HDR, color profiles and color temperature under Hy
 The plugin writes **color keys only** (`cm`, `sdrbrightness`, `sdrsaturation`, `sdr_min_luminance`, `sdr_max_luminance`, `min_luminance`, `max_luminance`, `max_avg_luminance`), always with `output = "desc:<monitor description>"`.
 Hyprland merges a rule into an earlier one with the *identical* output string, so keep `mode`, `position`, `scale`, `vrr` and `bitdepth` in `~/.config/hypr/monitors.lua` and give that rule the same `desc:` selector. `hdr.lua` is loaded right after `monitors.lua`, so its color keys win.
 
-Remove any `cm`, `sdr_*_luminance` keys from your own `monitors.lua` rule: the plugin owns them now.
+Remove any `cm`, `sdr_*_luminance` keys from your own `monitors.lua` rule (keep a copy, e.g. `monitors.lua.pre-plugin`): the plugin owns them now.
+A global `render.cm_sdr_eotf` setting can stay in `monitors.lua` until the plugin manages the per-monitor SDR EOTF.
 
 The panel UI is English by default; `i18n/fr.json` provides a French locale.
 

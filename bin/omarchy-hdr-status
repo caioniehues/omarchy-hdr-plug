@@ -10,8 +10,8 @@ jq -e 'type == "array"' <<<"$MONITORS_JSON" >/dev/null 2>&1 || MONITORS_JSON="[]
 
 TARGET="${1:-${HDR_MONITOR:-}}"
 MON_INFO=$(jq -c --arg m "$TARGET" '
-  first(.[] | select($m != "" and (.name == $m or .description == $m)))
-  // first(.[] | select(.focused)) // .[0] // empty' <<<"$MONITORS_JSON")
+  if $m != "" then first(.[] | select(.name == $m or .description == $m))
+  else first(.[] | select(.focused)) // .[0] end // empty' <<<"$MONITORS_JSON")
 if [[ -z "$MON_INFO" ]]; then
   echo "omarchy-hdr-status: no monitor found${TARGET:+ matching '$TARGET'}" >&2
   exit 1
@@ -21,7 +21,7 @@ CONNECTOR=$(jq -r '.name' <<<"$MON_INFO")
 # EDID capabilities for a connector. Outputs: "<hdr_capable> <max_nits> <avg_nits> <min_nits>".
 # Without an HDR static metadata block the panel is treated as a plain SDR display.
 read_edid_caps() {
-  local edid_file="" decoded
+  local edid_file="" decoded candidate
   local hdr_capable="false" max_l=300 avg_l=250 min_l=0.05
   for candidate in "${HDR_SYSFS_DRM:-/sys/class/drm}"/*-"$1"/edid; do
     [[ -r "$candidate" ]] && { edid_file="$candidate"; break; }

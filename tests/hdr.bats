@@ -51,11 +51,6 @@ load helpers
   [ "$(jq -c '[.hdrCapable, .edidMaxLuminance, .edidAvgLuminance, .edidMinLuminance]' <<<"$output")" = '[true,400,248,0]' ]
 }
 
-@test "a crafted color-space value cannot inject Lua into the rule" {
-  hdr_set cm 'hdr" }) os.execute("x'
-  run last_eval
-  [[ "$output" == *'cm = "hdr\" }) os.execute(\"x"'* ]]
-}
 
 @test "non-numeric slider input is rejected without touching state" {
   hdr_set on
@@ -63,4 +58,25 @@ load helpers
   run hdr_set sdr_brightness '1); os.execute("x"'
   [ "$status" -ne 0 ]
   [ "$(cat "$(state_file)")" = "$before" ]
+}
+
+@test "JSON strings in numeric slots cannot reach the Lua rule" {
+  hdr_set on
+  : > "$HYPRCTL_LOG"
+  run hdr_set sdr_brightness '"1 }) os.execute(\"x\") --"'
+  [ "$status" -ne 0 ]
+  [ -z "$(last_eval)" ]
+  ! grep -q os.execute "$(hdr_lua)"
+}
+
+@test "an unknown color space is rejected" {
+  run hdr_set cm bogus
+  [ "$status" -ne 0 ]
+  [ -z "$(last_eval)" ]
+}
+
+@test "an unknown monitor is an error, not the focused monitor" {
+  run hdr_set --monitor HDMI-A-9 on
+  [ "$status" -ne 0 ]
+  [ ! -e "$(state_file)" ]
 }

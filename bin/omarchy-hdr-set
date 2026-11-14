@@ -122,7 +122,8 @@ COLOR_TEMP=$(jq -r '.colorTemp' <<<"$CURRENT_JSON")
 # Fast path: color temperature only touches hyprsunset and the global colorTemp.
 if [[ "$ACTION" == "temperature" ]]; then
   [[ -n "$PARAM" ]] && COLOR_TEMP=$(apply_color_temp "$PARAM")
-  read_state | jq --argjson ct "$COLOR_TEMP" '.colorTemp = $ct' | write_state
+  STATE=$(read_state | jq --argjson ct "$COLOR_TEMP" '.colorTemp = $ct')
+  write_state <<<"$STATE"
   exit 0
 fi
 
@@ -159,7 +160,15 @@ case "$ACTION" in
   *) echo "omarchy-hdr-set: unknown action '$ACTION'" >&2; exit 2 ;;
 esac
 
-# 3. Persist per-monitor state (keyed by description; --argjson rejects non-numeric input)
+# 3. Validate user input (it ends up in Lua), then persist per-monitor state keyed by description
+for v in "$SDR_B" "$SDR_S" "$SDR_MAX_L"; do
+  [[ "$v" =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "omarchy-hdr-set: not a number: '$v'" >&2; exit 2; }
+done
+case "$CM_PRESET" in
+  auto|srgb|dcip3|dp3|adobe|wide|edid|hdr|hdredid) ;;
+  *) echo "omarchy-hdr-set: unknown color space '$CM_PRESET'" >&2; exit 2 ;;
+esac
+
 STATE=$(read_state | jq \
   --arg desc "$DESC" \
   --argjson enabled "$IS_ENABLED" \
