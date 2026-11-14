@@ -33,7 +33,7 @@ Hyprland merges a rule into an earlier one with the *identical* output string, s
 
 Remove any `cm`, `sdr_*_luminance` keys and a global `render.cm_sdr_eotf` from your own `monitors.lua` (keep a copy, e.g. `monitors.lua.pre-plugin`): the plugin owns them now.
 
-Hyprland's rule comparison ignores `vrr` and `sdr_eotf`, and applies them only on the next rule change. Every apply therefore sends the rule twice: once with SDR white nudged by 1 nit, then the real rule.
+Hyprland's rule comparison ignores `vrr` and `sdr_eotf`, and applies them only on the next rule change. Actions that can change them therefore send the rule twice: once with SDR white nudged by 1 nit, then the real rule.
 
 The panel UI is English by default; `i18n/fr.json` provides a French locale.
 

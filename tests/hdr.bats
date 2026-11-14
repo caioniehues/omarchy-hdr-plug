@@ -129,11 +129,25 @@ saved_preset() {
   [ -z "$(last_eval)" ]
 }
 
-@test "changes are applied with a one-nit nudge so Hyprland re-evaluates the rule" {
-  # Hyprland's rule compare ignores vrr/sdr_eotf; a soft change forces re-application.
-  hdr_set on
+@test "EOTF changes are applied with a one-nit nudge so Hyprland re-evaluates the rule" {
+  # Hyprland's rule compare ignores sdr_eotf; a soft change forces re-application.
+  hdr_set sdr_eotf srgb
   run grep '^eval ' "$HYPRCTL_LOG"
   [ "${#lines[@]}" -eq 2 ]
   [[ "${lines[0]}" == *"sdr_max_luminance = 251,"* ]]
   [[ "${lines[1]}" == *"sdr_max_luminance = 250,"* ]]
+}
+
+@test "slider changes send a single rule without a nudge" {
+  hdr_set sdr_max_lum 240
+  run grep -c '^eval ' "$HYPRCTL_LOG"
+  [ "$output" = 1 ]
+}
+
+@test "other saved monitors without an EOTF still get gamma 2.2 in hdr.lua" {
+  mkdir -p "$(dirname "$(state_file)")"
+  echo '{"monitors":{"Old Panel":{"enabled":true,"sdrBrightness":1,"sdrSaturation":1,"sdrMaxLuminance":200,"cm":"hdr","edidMinLuminance":0,"edidMaxLuminance":400,"edidAvgLuminance":250}}}' > "$(state_file)"
+  hdr_set on
+  run grep 'desc:Old Panel' "$(hdr_lua)"
+  [[ "$output" == *'sdr_eotf = "gamma22"'* ]]
 }

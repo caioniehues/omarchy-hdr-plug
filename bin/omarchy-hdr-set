@@ -31,7 +31,7 @@ def rule:
   "sdrbrightness = \($c.b), sdrsaturation = \($c.s), " +
   "sdr_min_luminance = \(.edidMinLuminance), sdr_max_luminance = \(.sdrMaxLuminance), " +
   "min_luminance = \(.edidMinLuminance), max_luminance = \(.edidMaxLuminance), " +
-  "max_avg_luminance = \(.edidAvgLuminance), sdr_eotf = \(.sdrEotf | tojson) })";'
+  "max_avg_luminance = \(.edidAvgLuminance), sdr_eotf = \(.sdrEotf // "gamma22" | tojson) })";'
 
 notify_hdr() {
   if command -v notify-send >/dev/null 2>&1; then
@@ -209,11 +209,13 @@ STATE=$(read_state | jq \
   }')
 write_state <<<"$STATE"
 
-# 4. Apply live. Hyprland's rule compare ignores vrr/sdr_eotf and applies them on the *next* rule
-# change, so send the rule once with SDR white nudged by 1 nit, then the real rule.
-SAVED=$(jq -c --arg desc "$DESC" '.monitors[$desc] + {desc: $desc}' <<<"$STATE")
-hyprctl eval "$(jq -r "$RULE_JQ"' .sdrMaxLuminance += 1 | rule' <<<"$SAVED")" >/dev/null 2>&1 || true
-hyprctl eval "$(jq -r "$RULE_JQ"' rule' <<<"$SAVED")" >/dev/null 2>&1 || true
+# 4. Apply live. Hyprland's rule compare ignores sdr_eotf and applies it on the *next* rule change,
+# so actions that can change it first send the rule with SDR white nudged by 1 nit.
+MONITOR_ENTRY=$(jq -c --arg desc "$DESC" '.monitors[$desc] + {desc: $desc}' <<<"$STATE")
+if [[ "$ACTION" =~ ^(sdr_eotf|preset)$ ]]; then
+  hyprctl eval "$(jq -r "$RULE_JQ"' .sdrMaxLuminance += 1 | rule' <<<"$MONITOR_ENTRY")" >/dev/null 2>&1 || true
+fi
+hyprctl eval "$(jq -r "$RULE_JQ"' rule' <<<"$MONITOR_ENTRY")" >/dev/null 2>&1 || true
 
 if [[ "$IS_ENABLED" == "true" ]]; then
   [[ "$ACTION" =~ ^(toggle|on|preset)$ ]] &&
