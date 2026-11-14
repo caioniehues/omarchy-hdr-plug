@@ -20,7 +20,7 @@ HDR_CONF="$HOME/.config/hypr/hdr.lua"
 SHELL_CONF="$HOME/.config/omarchy/shell.json"
 
 uninstall_plugin() {
-  echo -e "${BLUE}${BOLD}=== Désinstallation complète du plugin Omarchy HDR Control ===${NC}\n"
+  echo -e "${BLUE}${BOLD}=== Uninstalling Omarchy HDR Control ===${NC}\n"
 
   # 1. Reset display, hyprsunset, hdr.lua, and state
   if [[ -x "$TARGET_DIR/bin/omarchy-hdr-set" ]]; then
@@ -33,7 +33,7 @@ uninstall_plugin() {
   # 2. Remove from Hyprland config
   if [[ -f "$HYPR_CONF" ]]; then
     sed -i '/require.*"hypr\.hdr"/d' "$HYPR_CONF"
-    echo -e "${GREEN}✓ Référence hypr.hdr retirée de $HYPR_CONF.${NC}"
+    echo -e "${GREEN}✓ Removed hypr.hdr from $HYPR_CONF.${NC}"
   fi
 
   # 3. Unregister from Omarchy plugins & shell.json
@@ -50,12 +50,12 @@ uninstall_plugin() {
       .bar.layout.left = ((.bar.layout.left // []) | map(select(.id != $id))) |
       .bar.layout.center = ((.bar.layout.center // []) | map(select(.id != $id)))
     ' "$SHELL_CONF" > "$tmp_json" && mv "$tmp_json" "$SHELL_CONF"
-    echo -e "${GREEN}✓ Entrée $PLUGIN_ID retirée de $SHELL_CONF.${NC}"
+    echo -e "${GREEN}✓ Removed $PLUGIN_ID from $SHELL_CONF.${NC}"
   fi
 
   # 4. Remove plugin directory
   rm -rf "$TARGET_DIR"
-  echo -e "${GREEN}✓ Dossier $TARGET_DIR supprimé.${NC}"
+  echo -e "${GREEN}✓ Deleted $TARGET_DIR.${NC}"
 
   # 5. Reload Hyprland and Omarchy Shell
   command -v hyprctl >/dev/null 2>&1 && hyprctl reload >/dev/null 2>&1 || true
@@ -63,7 +63,7 @@ uninstall_plugin() {
     omarchy restart shell >/dev/null 2>&1 || omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true
   fi
 
-  echo -e "\n${GREEN}${BOLD}✓ Désinstallation terminée : aucune trace restante.${NC}"
+  echo -e "\n${GREEN}${BOLD}✓ Uninstall complete: nothing left behind.${NC}"
   exit 0
 }
 
@@ -71,31 +71,31 @@ if [[ "${1:-}" == "--uninstall" || "${1:-}" == "uninstall" ]]; then
   uninstall_plugin
 fi
 
-echo -e "${BLUE}${BOLD}=== Installation du plugin Omarchy HDR Control ===${NC}\n"
+echo -e "${BLUE}${BOLD}=== Installing Omarchy HDR Control ===${NC}\n"
 
-# 1. Vérification des dépendances (edid-decode, jq, hyprsunset)
-echo -e "${BLUE}1. Vérification des dépendances système...${NC}"
+# 1. Check dependencies (edid-decode, jq, hyprsunset)
+echo -e "${BLUE}1. Checking system dependencies...${NC}"
 MISSING_PKGS=()
 command -v edid-decode >/dev/null 2>&1 || MISSING_PKGS+=("edid-decode")
 command -v jq >/dev/null 2>&1 || MISSING_PKGS+=("jq")
 command -v hyprsunset >/dev/null 2>&1 || MISSING_PKGS+=("hyprsunset")
 
 if [[ ${#MISSING_PKGS[@]} -gt 0 ]]; then
-  echo -e "${YELLOW}Installation des paquets requis (${MISSING_PKGS[*]})...${NC}"
+  echo -e "${YELLOW}Installing required packages (${MISSING_PKGS[*]})...${NC}"
   if command -v omarchy >/dev/null 2>&1; then
     omarchy pkg add "${MISSING_PKGS[@]}"
   elif command -v sudo >/dev/null 2>&1; then
     sudo pacman -S --needed --noconfirm "${MISSING_PKGS[@]}"
   else
-    echo -e "${RED}Erreur : veuillez installer manuellement : ${MISSING_PKGS[*]}${NC}"
+    echo -e "${RED}Error: please install manually: ${MISSING_PKGS[*]}${NC}"
     exit 1
   fi
 else
-  echo -e "${GREEN}✓ Dépendances satisfaites (edid-decode, jq, hyprsunset).${NC}"
+  echo -e "${GREEN}✓ Dependencies satisfied (edid-decode, jq, hyprsunset).${NC}"
 fi
 
-# 2. Copie du plugin dans ~/.config/omarchy/plugins/caioniehues.hdr
-echo -e "\n${BLUE}2. Installation des fichiers du plugin...${NC}"
+# 2. Copy the plugin into ~/.config/omarchy/plugins/caioniehues.hdr
+echo -e "\n${BLUE}2. Installing plugin files...${NC}"
 mkdir -p "$TARGET_DIR/bin" "$TARGET_DIR/i18n"
 
 if [[ "$SCRIPT_DIR" != "$TARGET_DIR" ]]; then
@@ -107,42 +107,42 @@ if [[ "$SCRIPT_DIR" != "$TARGET_DIR" ]]; then
 fi
 
 chmod +x "$TARGET_DIR/bin/omarchy-hdr-status" "$TARGET_DIR/bin/omarchy-hdr-set"
-echo -e "${GREEN}✓ Fichiers installés dans $TARGET_DIR.${NC}"
+echo -e "${GREEN}✓ Files installed in $TARGET_DIR.${NC}"
 
-# Validation du manifeste Omarchy
+# Validate the Omarchy manifest
 if command -v omarchy >/dev/null 2>&1; then
   omarchy plugin validate "$TARGET_DIR"
-  echo -e "${GREEN}✓ Manifeste validé par omarchy plugin validate.${NC}"
+  echo -e "${GREEN}✓ Manifest validated by omarchy plugin validate.${NC}"
 fi
 
-# 3. Activation sécurisée dans Hyprland (~/.config/hypr/hyprland.lua)
-echo -e "\n${BLUE}3. Configuration de Hyprland...${NC}"
+# 3. Load hdr.lua from Hyprland (~/.config/hypr/hyprland.lua), tolerating its absence
+echo -e "\n${BLUE}3. Configuring Hyprland...${NC}"
 if [[ -f "$HYPR_CONF" ]]; then
   if grep -q '^require("hypr\.hdr")' "$HYPR_CONF"; then
     sed -i 's/^require("hypr\.hdr")/pcall(require, "hypr.hdr")/' "$HYPR_CONF"
-    echo -e "${GREEN}✓ Migration vers pcall(require, \"hypr.hdr\") effectuée.${NC}"
+    echo -e "${GREEN}✓ Migrated to pcall(require, \"hypr.hdr\").${NC}"
   elif ! grep -q 'hypr\.hdr' "$HYPR_CONF"; then
-    echo -e "${YELLOW}Ajout de pcall(require, \"hypr.hdr\") dans $HYPR_CONF...${NC}"
+    echo -e "${YELLOW}Adding pcall(require, \"hypr.hdr\") to $HYPR_CONF...${NC}"
     if grep -q 'require("hypr.monitors")' "$HYPR_CONF"; then
       sed -i '/require("hypr.monitors")/a pcall(require, "hypr.hdr")' "$HYPR_CONF"
     else
       echo 'pcall(require, "hypr.hdr")' >> "$HYPR_CONF"
     fi
-    echo -e "${GREEN}✓ Hyprland configuré pour charger hypr.hdr.${NC}"
+    echo -e "${GREEN}✓ Hyprland now loads hypr.hdr.${NC}"
   else
-    echo -e "${GREEN}✓ hypr.hdr est déjà configuré dans hyprland.lua.${NC}"
+    echo -e "${GREEN}✓ hypr.hdr is already loaded by hyprland.lua.${NC}"
   fi
 fi
 
-# 4. Initialisation de la configuration HDR (~/.config/hypr/hdr.lua)
-echo -e "\n${BLUE}4. Initialisation du profil matériel...${NC}"
+# 4. Generate the initial HDR config (~/.config/hypr/hdr.lua)
+echo -e "\n${BLUE}4. Initializing the display profile...${NC}"
 "$TARGET_DIR/bin/omarchy-hdr-set" on >/dev/null 2>&1 || true
-echo -e "${GREEN}✓ Configuration générée dans ~/.config/hypr/hdr.lua.${NC}"
+echo -e "${GREEN}✓ Generated ~/.config/hypr/hdr.lua.${NC}"
 
-# 5. Enregistrement natif dans les plugins Omarchy
-echo -e "\n${BLUE}5. Enregistrement dans les plugins Omarchy...${NC}"
+# 5. Register with Omarchy plugins
+echo -e "\n${BLUE}5. Registering with Omarchy plugins...${NC}"
 if command -v omarchy >/dev/null 2>&1 && omarchy plugin enable "$PLUGIN_ID" right >/dev/null 2>&1; then
-  echo -e "${GREEN}✓ Plugin activé via omarchy plugin enable.${NC}"
+  echo -e "${GREEN}✓ Plugin enabled via omarchy plugin enable.${NC}"
 elif [[ -f "$SHELL_CONF" ]]; then
   TMP_JSON=$(mktemp)
   jq --arg id "$PLUGIN_ID" '
@@ -161,17 +161,17 @@ elif [[ -f "$SHELL_CONF" ]]; then
       .
     end
   ' "$SHELL_CONF" > "$TMP_JSON" && mv "$TMP_JSON" "$SHELL_CONF"
-  echo -e "${GREEN}✓ Plugin enregistré dans shell.json.${NC}"
+  echo -e "${GREEN}✓ Plugin registered in shell.json.${NC}"
 fi
 
-# 6. Rechargement du shell
-echo -e "\n${BLUE}6. Rechargement du Shell Omarchy...${NC}"
+# 6. Reload the shell
+echo -e "\n${BLUE}6. Reloading the Omarchy shell...${NC}"
 if command -v omarchy >/dev/null 2>&1; then
   omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true
   omarchy restart shell >/dev/null 2>&1 || true
 fi
 
 echo -e "\n${GREEN}${BOLD}======================================================${NC}"
-echo -e "${GREEN}${BOLD} Installation terminée avec succès !${NC}"
-echo -e "${GREEN}${BOLD} Le plugin $PLUGIN_ID est actif dans Omarchy et la barre.${NC}"
+echo -e "${GREEN}${BOLD} Installation complete!${NC}"
+echo -e "${GREEN}${BOLD} $PLUGIN_ID is active in Omarchy and the bar.${NC}"
 echo -e "${GREEN}${BOLD}======================================================${NC}"

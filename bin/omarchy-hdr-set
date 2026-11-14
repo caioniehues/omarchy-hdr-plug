@@ -84,7 +84,7 @@ reset_all() {
     hyprctl reload >/dev/null 2>&1 || true
   fi
 
-  notify_hdr "Affichage HDR" "Configuration réinitialisée à l'état d'origine"
+  notify_hdr "HDR Display" "Configuration reset to factory defaults"
   exit 0
 }
 
@@ -275,13 +275,13 @@ if [[ "$IS_ENABLED" == "true" ]]; then
   hyprctl eval "hl.monitor({ output = \"$MONITOR\", mode = \"preferred\", position = \"auto\", scale = $SCALE, bitdepth = 10, cm = \"$CM_PRESET\", sdrbrightness = $SDR_B, sdrsaturation = $SDR_S, sdr_min_luminance = $EDID_MIN_L, sdr_max_luminance = $SDR_MAX_L, min_luminance = $EDID_MIN_L, max_luminance = $EDID_MAX_L, max_avg_luminance = $EDID_AVG_L })" >/dev/null 2>&1 || true
 
   if [[ "$ACTION" == "toggle" || "$ACTION" == "on" || "$ACTION" == "preset" ]]; then
-    notify_hdr "Affichage HDR ($MONITOR)" "HDR Activé ($CM_PRESET • ${SDR_MAX_L} nits • ${COLOR_TEMP}K)"
+    notify_hdr "HDR Display ($MONITOR)" "HDR enabled ($CM_PRESET • ${SDR_MAX_L} nits • ${COLOR_TEMP}K)"
   fi
 else
   hyprctl eval "hl.monitor({ output = \"$MONITOR\", mode = \"preferred\", position = \"auto\", scale = $SCALE, bitdepth = 10, cm = \"srgb\", sdrbrightness = 1.0, sdrsaturation = 1.0, sdr_min_luminance = $EDID_MIN_L, sdr_max_luminance = $EDID_AVG_L, min_luminance = $EDID_MIN_L, max_luminance = $EDID_MAX_L })" >/dev/null 2>&1 || true
 
   if [[ "$ACTION" == "toggle" || "$ACTION" == "off" || "$ACTION" == "preset" ]]; then
-    notify_hdr "Affichage HDR ($MONITOR)" "Mode SDR Standard activé"
+    notify_hdr "HDR Display ($MONITOR)" "Standard SDR mode enabled"
   fi
 fi
 
