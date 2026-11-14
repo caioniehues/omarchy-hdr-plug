@@ -23,7 +23,7 @@
   "sdr_brightness": "SDR Brightness Boost",
   "sdr_saturation": "SDR Color Saturation",
   "color_gamut": "Color Space",
-  "backlight_sync": "Backlight Sync",
+
   "presets_title": "Quick Presets",
   "optimal_edid": "Optimal EDID",
   "rescan": "Rescan Display",

@@ -1,165 +1,78 @@
 #!/usr/bin/env bash
-# Returns rich JSON status of HDR, EDID capabilities, available monitors, and color controls.
+# Prints JSON status for one monitor: identity, EDID HDR capabilities, saved settings, and the monitor list.
+# Usage: omarchy-hdr-status [connector|description]   (default: $HDR_MONITOR, else focused, else first)
 set -euo pipefail
 
-STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/caioniehues.hdr"
-STATE_FILE="$STATE_DIR/state.json"
+STATE_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/caioniehues.hdr/state.json"
 
-RAW_MONITORS=$(hyprctl monitors -j 2>/dev/null || true)
-if [[ -n "$RAW_MONITORS" ]] && jq -e 'type == "array"' <<<"$RAW_MONITORS" >/dev/null 2>&1; then
-  MONITORS_JSON="$RAW_MONITORS"
-else
-  MONITORS_JSON="[]"
+MONITORS_JSON=$(hyprctl monitors -j 2>/dev/null || true)
+jq -e 'type == "array"' <<<"$MONITORS_JSON" >/dev/null 2>&1 || MONITORS_JSON="[]"
+
+TARGET="${1:-${HDR_MONITOR:-}}"
+MON_INFO=$(jq -c --arg m "$TARGET" '
+  first(.[] | select($m != "" and (.name == $m or .description == $m)))
+  // first(.[] | select(.focused)) // .[0] // empty' <<<"$MONITORS_JSON")
+if [[ -z "$MON_INFO" ]]; then
+  echo "omarchy-hdr-status: no monitor found${TARGET:+ matching '$TARGET'}" >&2
+  exit 1
 fi
+CONNECTOR=$(jq -r '.name' <<<"$MON_INFO")
 
-# Read EDID capabilities for a given connector name (e.g. eDP-1, DP-2).
-# Outputs: "<hdr_capable> <max_lum> <avg_lum> <min_lum>"
+# EDID capabilities for a connector. Outputs: "<hdr_capable> <max_nits> <avg_nits> <min_nits>".
+# Without an HDR static metadata block the panel is treated as a plain SDR display.
 read_edid_caps() {
-  local mon="$1"
-  local edid_file=""
-  local hdr_capable="false"
-  local max_l=300
-  local avg_l=250
-  local min_l=0.05
-
-  for candidate in "${HDR_SYSFS_DRM:-/sys/class/drm}"/*-"$mon"/edid; do
-    if [[ -r "$candidate" ]]; then
-      edid_file="$candidate"
-      break
-    fi
+  local edid_file="" decoded
+  local hdr_capable="false" max_l=300 avg_l=250 min_l=0.05
+  for candidate in "${HDR_SYSFS_DRM:-/sys/class/drm}"/*-"$1"/edid; do
+    [[ -r "$candidate" ]] && { edid_file="$candidate"; break; }
   done
 
   if [[ -n "$edid_file" ]] && command -v edid-decode >/dev/null 2>&1; then
-    local decoded
     decoded=$(edid-decode "$edid_file" 2>/dev/null || true)
-
-    if grep -qE "HDR Static Metadata Data Block|SMPTE ST2084|Desired content max luminance" <<<"$decoded"; then
+    if grep -q "SMPTE ST2084" <<<"$decoded"; then
       hdr_capable="true"
-      max_l=617
-      avg_l=400
-      min_l=0.005
-    fi
-
-    local max_val avg_val min_val parsed
-    max_val=$(grep -m1 "Desired content max luminance" <<<"$decoded" | sed -nE 's/.*\(([0-9.]+).*/\1/p' || true)
-    avg_val=$(grep -m1 "Desired content max frame-average luminance" <<<"$decoded" | sed -nE 's/.*\(([0-9.]+).*/\1/p' || true)
-    min_val=$(grep -m1 "Desired content min luminance" <<<"$decoded" | sed -nE 's/.*\(([0-9.]+).*/\1/p' || true)
-
-    if [[ -n "$max_val" ]]; then
-      parsed=$(awk -v v="$max_val" 'BEGIN { print int(v + 0.5) }' 2>/dev/null || true)
-      [[ -n "$parsed" && "$parsed" -gt 0 ]] && max_l="$parsed"
-    fi
-    if [[ -n "$avg_val" ]]; then
-      parsed=$(awk -v v="$avg_val" 'BEGIN { print int(v + 0.5) }' 2>/dev/null || true)
-      [[ -n "$parsed" && "$parsed" -gt 0 ]] && avg_l="$parsed"
-    fi
-    if [[ -n "$min_val" ]] && awk -v v="$min_val" 'BEGIN { exit !(v >= 0) }' 2>/dev/null; then
-      min_l="$min_val"
+      local v
+      v=$(sed -nE 's/.*Desired content max luminance: .*\(([0-9.]+) cd.*/\1/p' <<<"$decoded" | head -1)
+      [[ -n "$v" ]] && max_l=$(awk -v v="$v" 'BEGIN { print int(v + 0.5) }')
+      v=$(sed -nE 's/.*Desired content max frame-average luminance: .*\(([0-9.]+) cd.*/\1/p' <<<"$decoded" | head -1)
+      [[ -n "$v" ]] && avg_l=$(awk -v v="$v" 'BEGIN { print int(v + 0.5) }')
+      v=$(sed -nE 's/.*Desired content min luminance: .*\(([0-9.]+) cd.*/\1/p' <<<"$decoded" | head -1)
+      [[ -n "$v" ]] && min_l=$(awk -v v="$v" 'BEGIN { print v + 0 }')
     fi
   fi
-
   echo "$hdr_capable $max_l $avg_l $min_l"
 }
+read -r HDR_CAPABLE EDID_MAX_L EDID_AVG_L EDID_MIN_L <<<"$(read_edid_caps "$CONNECTOR")"
 
-# 1. Determine target monitor (CLI arg > env > focused > first > eDP-1)
-TARGET_MON="${1:-${HDR_MONITOR:-}}"
-if [[ -z "$TARGET_MON" ]]; then
-  TARGET_MON=$(jq -r '(.[] | select(.focused == true) | .name) // (.[0] | .name) // "eDP-1"' <<<"$MONITORS_JSON" 2>/dev/null || echo "eDP-1")
-fi
-[[ -z "$TARGET_MON" || "$TARGET_MON" == "null" ]] && TARGET_MON="eDP-1"
-
-MON_INFO=$(jq -c --arg m "$TARGET_MON" '(.[] | select(.name == $m)) // empty' <<<"$MONITORS_JSON" 2>/dev/null || true)
-
-if [[ -z "$MON_INFO" || "$MON_INFO" == "null" ]]; then
-  MON_DESC="Display $TARGET_MON"
-  SCALE="1.0"
-  HYPR_CM="srgb"
-else
-  MON_DESC=$(jq -r '.description // .name // "Display"' <<<"$MON_INFO" 2>/dev/null || echo "Display")
-  SCALE=$(jq -r '.scale // 1.0' <<<"$MON_INFO" 2>/dev/null || echo "1.0")
-  HYPR_CM=$(jq -r '.colorManagementPreset // "srgb"' <<<"$MON_INFO" 2>/dev/null || echo "srgb")
+STATE="{}"
+if [[ -f "$STATE_FILE" ]] && jq -e 'type == "object"' "$STATE_FILE" >/dev/null 2>&1; then
+  STATE=$(<"$STATE_FILE")
 fi
 
-# 2. Extract EDID capabilities for target monitor
-read -r HDR_CAPABLE EDID_MAX_L EDID_AVG_L EDID_MIN_L <<<"$(read_edid_caps "$TARGET_MON")"
-
-# Build monitors list for UI selector
-MONITORS_LIST="[]"
-if [[ "$MONITORS_JSON" != "[]" ]]; then
-  MONITORS_LIST=$(jq -c '[.[] | {name: .name, description: (.description // .name), focused: (.focused // false), scale: (.scale // 1.0)}]' <<<"$MONITORS_JSON" 2>/dev/null || echo "[]")
-fi
-
-# 3. Read persistent user state (per-monitor XDG state)
-ACTIVE_STATE_FILE=""
-if [[ -f "$STATE_FILE" ]] && jq -e . "$STATE_FILE" >/dev/null 2>&1; then
-  ACTIVE_STATE_FILE="$STATE_FILE"
-fi
-
-DEFAULT_ENABLED=$([[ "$HYPR_CM" == "hdr" ]] && echo "true" || echo "false")
-ENABLED="$DEFAULT_ENABLED"
-SDR_B="1.80"
-SDR_S="1.15"
-SDR_MAX_L="$EDID_MAX_L"
-CM_PRESET=$([[ "$HDR_CAPABLE" == "true" ]] && echo "hdr" || echo "srgb")
-BL_SYNC="true"
-PRESET=$([[ "$HDR_CAPABLE" == "true" ]] && echo "vivid" || echo "eco")
-COLOR_TEMP="6500"
-
-if [[ -n "$ACTIVE_STATE_FILE" ]]; then
-  COLOR_TEMP=$(jq -r '.colorTemp // 6500' "$ACTIVE_STATE_FILE" 2>/dev/null || echo "6500")
-  MON_STATE=$(jq -c --arg m "$TARGET_MON" '
-    if .monitors[$m] then .monitors[$m]
-    elif (.monitor == $m) or (.monitors == null and .enabled != null) then .
-    else empty
-    end
-  ' "$ACTIVE_STATE_FILE" 2>/dev/null || true)
-
-  if [[ -n "$MON_STATE" ]]; then
-    ENABLED=$(jq -r --argjson d "$DEFAULT_ENABLED" 'if .enabled != null then .enabled else $d end' <<<"$MON_STATE")
-    SDR_B=$(jq -r '.sdrBrightness // 1.80' <<<"$MON_STATE")
-    SDR_S=$(jq -r '.sdrSaturation // 1.15' <<<"$MON_STATE")
-    SDR_MAX_L=$(jq -r --argjson d "$EDID_MAX_L" '.sdrMaxLuminance // $d' <<<"$MON_STATE")
-    CM_PRESET=$(jq -r --arg d "$CM_PRESET" '.cm // $d' <<<"$MON_STATE")
-    BL_SYNC=$(jq -r 'if .backlightSync != null then .backlightSync else true end' <<<"$MON_STATE")
-    PRESET=$(jq -r --arg d "$PRESET" '.preset // $d' <<<"$MON_STATE")
-  fi
-fi
-
-# 4. Emit complete JSON
 jq -n \
-  --arg mon "$TARGET_MON" \
-  --arg desc "$MON_DESC" \
-  --argjson scale "$SCALE" \
-  --argjson enabled "$ENABLED" \
+  --argjson mon "$MON_INFO" \
+  --argjson monitors "$MONITORS_JSON" \
+  --argjson state "$STATE" \
   --argjson hdrCapable "$HDR_CAPABLE" \
-  --argjson sdrBrightness "$SDR_B" \
-  --argjson sdrSaturation "$SDR_S" \
-  --argjson sdrMaxLuminance "$SDR_MAX_L" \
-  --argjson maxLuminance "$EDID_MAX_L" \
-  --argjson edidMaxLuminance "$EDID_MAX_L" \
-  --argjson edidAvgLuminance "$EDID_AVG_L" \
-  --argjson edidMinLuminance "$EDID_MIN_L" \
-  --arg cm "$CM_PRESET" \
-  --argjson backlightSync "$BL_SYNC" \
-  --arg preset "$PRESET" \
-  --argjson colorTemp "$COLOR_TEMP" \
-  --argjson monitors "$MONITORS_LIST" \
-  '{
-    monitor: $mon,
-    monitorName: $desc,
-    scale: $scale,
-    enabled: $enabled,
+  --argjson edidMax "$EDID_MAX_L" \
+  --argjson edidAvg "$EDID_AVG_L" \
+  --argjson edidMin "$EDID_MIN_L" '
+  def or_default($d): if . == null then $d else . end;
+  ($state.monitors[$mon.description] // {}) as $s |
+  {
+    monitor: $mon.name,
+    description: $mon.description,
+    monitorName: $mon.description,
     hdrCapable: $hdrCapable,
-    sdrBrightness: $sdrBrightness,
-    sdrSaturation: $sdrSaturation,
-    sdrMaxLuminance: $sdrMaxLuminance,
-    maxLuminance: $maxLuminance,
-    edidMaxLuminance: $edidMaxLuminance,
-    edidAvgLuminance: $edidAvgLuminance,
-    edidMinLuminance: $edidMinLuminance,
-    cm: $cm,
-    backlightSync: $backlightSync,
-    preset: $preset,
-    colorTemp: $colorTemp,
-    monitors: $monitors
+    enabled: ($s.enabled | or_default($mon.colorManagementPreset == "hdr")),
+    sdrBrightness: ($s.sdrBrightness | or_default(1.80)),
+    sdrSaturation: ($s.sdrSaturation | or_default(1.15)),
+    sdrMaxLuminance: ($s.sdrMaxLuminance | or_default($edidMax)),
+    edidMaxLuminance: $edidMax,
+    edidAvgLuminance: $edidAvg,
+    edidMinLuminance: $edidMin,
+    cm: ($s.cm | or_default(if $hdrCapable then "hdr" else "srgb" end)),
+    preset: ($s.preset | or_default(if $hdrCapable then "vivid" else "eco" end)),
+    colorTemp: ($state.colorTemp | or_default(6500)),
+    monitors: [$monitors[] | {name, description, focused: (.focused // false)}]
   }'

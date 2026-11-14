@@ -18,21 +18,20 @@ Panel {
   property bool hdrEnabled: true
   property bool hdrCapable: true
   property string selectedMonitor: ""
-  property string monitor: "eDP-1"
+  property string monitor: ""
   property string monitorName: "Display"
   property var monitors: []
   property real sdrBrightness: 1.80
   property real sdrSaturation: 1.15
-  property real sdrMaxLum: 617.0
-  property real edidMaxLum: 617.0
-  property real edidAvgLum: 400.0
-  property real edidMinLum: 0.005
+  property real sdrMaxLum: 300
+  property real edidMaxLum: 300
+  property real edidAvgLum: 250
+  property real edidMinLum: 0.05
   property string cmPreset: "hdr"
-  property bool backlightSync: true
   property string currentPreset: "vivid"
   property real colorTemp: 6500
   property real pendingTemp: 6500
-  property real pendingSdrMaxLum: 617
+  property real pendingSdrMaxLum: 300
   property real pendingSdrBrightness: 1.80
   property real pendingSdrSaturation: 1.15
   property bool showAdvanced: true
@@ -105,8 +104,7 @@ Panel {
       root.pendingSdrBrightness.toFixed(2),
       root.pendingSdrSaturation.toFixed(2),
       Math.round(root.pendingSdrMaxLum).toString(),
-      root.cmPreset,
-      root.backlightSync ? "true" : "false"
+      root.cmPreset
     ])
   }
 
@@ -120,19 +118,18 @@ Panel {
           var data = JSON.parse(text)
           root.hdrEnabled = data.enabled === true
           root.hdrCapable = data.hdrCapable !== false
-          root.monitor = data.monitor || "eDP-1"
+          root.monitor = data.monitor || ""
           root.monitorName = data.monitorName || root.monitor
           root.monitors = Array.isArray(data.monitors) ? data.monitors : []
           if (!sliderDebounce.running) {
             root.sdrBrightness = data.sdrBrightness !== undefined ? data.sdrBrightness : 1.80
             root.sdrSaturation = data.sdrSaturation !== undefined ? data.sdrSaturation : 1.15
-            root.sdrMaxLum = data.sdrMaxLuminance !== undefined ? data.sdrMaxLuminance : 617.0
+            root.sdrMaxLum = data.sdrMaxLuminance !== undefined ? data.sdrMaxLuminance : 300
           }
-          root.edidMaxLum = data.edidMaxLuminance !== undefined ? data.edidMaxLuminance : 617.0
-          root.edidAvgLum = data.edidAvgLuminance !== undefined ? data.edidAvgLuminance : 400.0
-          root.edidMinLum = data.edidMinLuminance !== undefined ? data.edidMinLuminance : 0.005
+          root.edidMaxLum = data.edidMaxLuminance !== undefined ? data.edidMaxLuminance : 300
+          root.edidAvgLum = data.edidAvgLuminance !== undefined ? data.edidAvgLuminance : 250
+          root.edidMinLum = data.edidMinLuminance !== undefined ? data.edidMinLuminance : 0.05
           root.cmPreset = data.cm || "hdr"
-          root.backlightSync = data.backlightSync !== false
           root.currentPreset = data.preset || "custom"
           if (!tempDebounce.running && data.colorTemp !== undefined) {
             root.colorTemp = data.colorTemp
@@ -503,28 +500,6 @@ Panel {
               value: root.sdrSaturation
               onMoved: function(v) { root.sdrSaturation = v; root.scheduleSliders() }
             }
-          }
-        }
-
-        // Backlight Sync Toggle
-        Item {
-          width: parent.width
-          implicitHeight: Math.max(blLabel.implicitHeight, blSwitch.implicitHeight)
-          Text {
-            id: blLabel
-            anchors.verticalCenter: parent.verticalCenter
-            text: strings.t("backlight_sync")
-            font.family: Style.font.family
-            font.pixelSize: Style.font.bodySmall
-            color: root.panelForeground
-          }
-          ToggleSwitch {
-            id: blSwitch
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            checked: root.backlightSync
-            busy: actionProc.running
-            onToggled: root.runAction(["backlight_sync", root.backlightSync ? "false" : "true"])
           }
         }
 
