@@ -77,6 +77,7 @@ jq -n \
     presetSdrWhite: $white,
     cm: ($s.cm | or_default(if $hdrCapable then "hdr" else "srgb" end)),
     sdrEotf: ($s.sdrEotf | or_default("gamma22")),
+    vrr: ($s.vrr | or_default(2)),
     preset: ($s.preset | or_default(if $hdrCapable then "desktop" else "sdr" end)),
     colorTemp: ($state.colorTemp | or_default(6500)),
     monitors: [$monitors[] | {name, description, focused: (.focused // false)}]

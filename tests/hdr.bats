@@ -151,3 +151,32 @@ saved_preset() {
   run grep 'desc:Old Panel' "$(hdr_lua)"
   [[ "$output" == *'sdr_eotf = "gamma22"'* ]]
 }
+
+@test "VRR defaults to fullscreen-only and round-trips through state and hdr.lua" {
+  hdr_set on
+  [[ "$(last_eval)" == *"vrr = 2"* ]]
+  hdr_set vrr 1
+  [[ "$(last_eval)" == *"vrr = 1"* ]]
+  grep -q "vrr = 1" "$(hdr_lua)"
+  run hdr_status
+  [ "$(jq -r .vrr <<<"$output")" = 1 ]
+}
+
+@test "presets leave the VRR setting alone" {
+  hdr_set vrr 0
+  hdr_set preset sdr
+  hdr_set preset desktop
+  [[ "$(last_eval)" == *"vrr = 0"* ]]
+}
+
+@test "VRR only accepts off, on or fullscreen-only" {
+  run hdr_set vrr 3
+  [ "$status" -ne 0 ]
+  [ -z "$(last_eval)" ]
+}
+
+@test "VRR changes are applied with the one-nit nudge" {
+  hdr_set vrr 0
+  run grep -c '^eval ' "$HYPRCTL_LOG"
+  [ "$output" = 2 ]
+}

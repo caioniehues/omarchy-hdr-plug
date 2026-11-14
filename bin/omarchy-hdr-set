@@ -31,7 +31,8 @@ def rule:
   "sdrbrightness = \($c.b), sdrsaturation = \($c.s), " +
   "sdr_min_luminance = \(.edidMinLuminance), sdr_max_luminance = \(.sdrMaxLuminance), " +
   "min_luminance = \(.edidMinLuminance), max_luminance = \(.edidMaxLuminance), " +
-  "max_avg_luminance = \(.edidAvgLuminance), sdr_eotf = \(.sdrEotf // "gamma22" | tojson) })";'
+  "max_avg_luminance = \(.edidAvgLuminance), sdr_eotf = \(.sdrEotf // "gamma22" | tojson), " +
+  "vrr = \(.vrr // 2) })";'
 
 notify_hdr() {
   if command -v notify-send >/dev/null 2>&1; then
@@ -117,6 +118,7 @@ SDR_S=$(jq -r '.sdrSaturation' <<<"$CURRENT_JSON")
 SDR_MAX_L=$(jq -r '.sdrMaxLuminance' <<<"$CURRENT_JSON")
 CM_PRESET=$(jq -r '.cm' <<<"$CURRENT_JSON")
 SDR_EOTF=$(jq -r '.sdrEotf' <<<"$CURRENT_JSON")
+VRR=$(jq -r '.vrr' <<<"$CURRENT_JSON")
 PRESET=$(jq -r '.preset' <<<"$CURRENT_JSON")
 COLOR_TEMP=$(jq -r '.colorTemp' <<<"$CURRENT_JSON")
 
@@ -151,6 +153,7 @@ case "$ACTION" in
   sdr_max_lum) [[ -n "$PARAM" ]] && SDR_MAX_L="$PARAM"; PRESET="custom" ;;
   cm) [[ -n "$PARAM" ]] && CM_PRESET="$PARAM"; PRESET="custom" ;;
   sdr_eotf) [[ -n "$PARAM" ]] && SDR_EOTF="$PARAM"; PRESET="custom" ;;
+  vrr) [[ -n "$PARAM" ]] && VRR="$PARAM" ;;
   preset)
     SDR_WHITE=$(jq -r '.presetSdrWhite' <<<"$CURRENT_JSON")
     # All presets use cm=hdr, saturation 1, gamma 2.2, 6500 K; sdr sends srgb only because it disables HDR.
@@ -180,6 +183,8 @@ case "$SDR_EOTF" in
   gamma22|srgb) ;;
   *) echo "omarchy-hdr-set: unknown SDR EOTF '$SDR_EOTF' (gamma22|srgb)" >&2; exit 2 ;;
 esac
+# 0 off, 1 always, 2 fullscreen only (Hyprland's 3, fullscreen games/video only, isn't offered).
+[[ "$VRR" =~ ^[012]$ ]] || { echo "omarchy-hdr-set: VRR must be 0, 1 or 2" >&2; exit 2; }
 
 STATE=$(read_state | jq \
   --arg desc "$DESC" \
@@ -189,6 +194,7 @@ STATE=$(read_state | jq \
   --argjson sdrMaxL "$SDR_MAX_L" \
   --arg cm "$CM_PRESET" \
   --arg sdrEotf "$SDR_EOTF" \
+  --argjson vrr "$VRR" \
   --arg preset "$PRESET" \
   --argjson edidMinL "$EDID_MIN_L" \
   --argjson edidMaxL "$EDID_MAX_L" \
@@ -202,6 +208,7 @@ STATE=$(read_state | jq \
     sdrMaxLuminance: $sdrMaxL,
     cm: $cm,
     sdrEotf: $sdrEotf,
+    vrr: $vrr,
     preset: $preset,
     edidMinLuminance: $edidMinL,
     edidMaxLuminance: $edidMaxL,
@@ -209,10 +216,10 @@ STATE=$(read_state | jq \
   }')
 write_state <<<"$STATE"
 
-# 4. Apply live. Hyprland's rule compare ignores sdr_eotf and applies it on the *next* rule change,
-# so actions that can change it first send the rule with SDR white nudged by 1 nit.
+# 4. Apply live. Hyprland's rule compare ignores vrr/sdr_eotf and applies them on the *next* rule
+# change, so actions that can change them first send the rule with SDR white nudged by 1 nit.
 MONITOR_ENTRY=$(jq -c --arg desc "$DESC" '.monitors[$desc] + {desc: $desc}' <<<"$STATE")
-if [[ "$ACTION" =~ ^(sdr_eotf|preset)$ ]]; then
+if [[ "$ACTION" =~ ^(sdr_eotf|vrr|preset)$ ]]; then
   hyprctl eval "$(jq -r "$RULE_JQ"' .sdrMaxLuminance += 1 | rule' <<<"$MONITOR_ENTRY")" >/dev/null 2>&1 || true
 fi
 hyprctl eval "$(jq -r "$RULE_JQ"' rule' <<<"$MONITOR_ENTRY")" >/dev/null 2>&1 || true

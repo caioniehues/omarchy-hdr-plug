@@ -29,6 +29,7 @@ Panel {
   property real edidMinLum: 0.05
   property string cmPreset: "hdr"
   property string sdrEotf: "gamma22"
+  property int vrr: 2
   property string currentPreset: "desktop"
   property real colorTemp: 6500
   property real pendingTemp: 6500
@@ -132,6 +133,7 @@ Panel {
           root.edidMinLum = data.edidMinLuminance !== undefined ? data.edidMinLuminance : 0.05
           root.cmPreset = data.cm || "hdr"
           root.sdrEotf = data.sdrEotf || "gamma22"
+          root.vrr = data.vrr !== undefined ? data.vrr : 2
           root.currentPreset = data.preset || "custom"
           if (!tempDebounce.running && data.colorTemp !== undefined) {
             root.colorTemp = data.colorTemp
@@ -408,6 +410,32 @@ Panel {
               bordered: true
               selected: root.sdrEotf === "srgb"
               onClicked: root.runAction(["sdr_eotf", "srgb"])
+            }
+          }
+        }
+
+        // Variable refresh rate (fullscreen-only avoids OLED brightness flicker on the desktop)
+        Column {
+          width: parent.width
+          spacing: Style.space(6)
+          PanelSectionHeader { text: strings.t("vrr"); foreground: root.panelForeground }
+
+          Flow {
+            width: parent.width
+            spacing: Style.space(6)
+            Repeater {
+              model: [
+                { value: 0, label: strings.t("vrr_off") },
+                { value: 1, label: strings.t("vrr_on") },
+                { value: 2, label: strings.t("vrr_fullscreen") }
+              ]
+              Button {
+                required property var modelData
+                text: modelData.label
+                bordered: true
+                selected: root.vrr === modelData.value
+                onClicked: root.runAction(["vrr", modelData.value.toString()])
+              }
             }
           }
         }
