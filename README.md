@@ -11,8 +11,9 @@ Omarchy bar plugin to control HDR, color profiles and color temperature under Hy
   - Detects the monitor, its EDID HDR capabilities (max luminance in nits), and supports multiple monitors (`Dropdown`).
   - HDR on/off switch and hardware rescan button (`󰑐`).
   - Color temperature slider (3000–9000 K) driven by `hyprsunset`, debounced.
-  - HDR modes: `Vivid HDR`, `Cinema HDR`, `Outdoor`.
+  - HDR modes: `Vivid HDR`, `Cinema HDR`, `Outdoor`, `Optimal EDID`.
   - SDR modes: `Cinema (P3)`, `Design (sRGB)`.
+  - Color space selector (HDR / DCI-P3 / sRGB) and sliders for target SDR luminance, SDR brightness boost and SDR saturation.
   - **Reset** button with a confirmation dialog to restore the native display settings.
 - **XDG persistence**: per-monitor state in `~/.local/state/caioniehues.hdr/state.json`; generated Hyprland config in `~/.config/hypr/hdr.lua`.
 

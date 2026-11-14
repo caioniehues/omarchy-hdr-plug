@@ -84,7 +84,7 @@ reset_all() {
     hyprctl reload >/dev/null 2>&1 || true
   fi
 
-  notify_hdr "HDR Display" "Configuration reset to factory defaults"
+  notify_hdr "HDR Display" "Configuration restored to its original state"
   exit 0
 }
 
