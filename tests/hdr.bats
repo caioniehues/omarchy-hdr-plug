@@ -150,6 +150,7 @@ saved_preset() {
   hdr_set on
   run grep 'desc:Old Panel' "$(hdr_lua)"
   [[ "$output" == *'sdr_eotf = "gamma22"'* ]]
+  [[ "$output" == *'vrr = 2'* ]]
 }
 
 @test "VRR defaults to fullscreen-only and round-trips through state and hdr.lua" {
@@ -177,6 +178,8 @@ saved_preset() {
 
 @test "VRR changes are applied with the one-nit nudge" {
   hdr_set vrr 0
-  run grep -c '^eval ' "$HYPRCTL_LOG"
-  [ "$output" = 2 ]
+  run grep '^eval ' "$HYPRCTL_LOG"
+  [ "${#lines[@]}" -eq 2 ]
+  [[ "${lines[0]}" == *"sdr_max_luminance = 251,"*"vrr = 0"* ]]
+  [[ "${lines[1]}" == *"sdr_max_luminance = 250,"*"vrr = 0"* ]]
 }

@@ -70,7 +70,7 @@ To remove the plugin completely and restore the system as if it had never been i
   - `sdr_eotf gamma22|srgb`
   - `vrr 0|1|2` (off / on / fullscreen only)
   - `apply <brightness> <saturation> <max_luminance> <cm>`
-  - `reset` (resets `hyprsunset`, deletes `hdr.lua` and `state.json`, reloads Hyprland)
+  - `reset` (resets `hyprsunset`, deletes `hdr.lua` and `state.json`, reloads Hyprland). Afterwards no rule sets the plugin-owned keys, so Hyprland defaults apply (HDR off, global VRR) until you restore them in `monitors.lua` or use the plugin again.
 
 ## Tests
 

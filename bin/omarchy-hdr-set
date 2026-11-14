@@ -2,8 +2,8 @@
 # Changes HDR settings for one monitor: updates per-monitor state, applies a color-only rule live via
 # `hyprctl eval`, drives hyprsunset, and regenerates ~/.config/hypr/hdr.lua.
 #
-# Rules are keyed by `desc:<description>` and carry only color keys. Hyprland merges a rule into the
-# earlier one with the identical output string, so mode/position/vrr from monitors.lua stay intact.
+# Rules are keyed by `desc:<description>` and carry only color and vrr keys. Hyprland merges a rule into
+# the earlier one with the identical output string, so mode/position/scale from monitors.lua stay intact.
 set -euo pipefail
 
 PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
