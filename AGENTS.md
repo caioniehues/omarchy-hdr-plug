@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Session handoff
+
+Resuming work? Read `docs/HANDOFF.md` first: current state, live machine setup, decisions, next steps and gotchas.
+
 ## Agent skills
 
 ### Issue tracker
