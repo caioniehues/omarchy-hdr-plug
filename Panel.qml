@@ -588,7 +588,10 @@ Panel {
             bordered: true
             selected: !root.peakOverridden
             tooltipText: strings.t("peak_reset_tooltip")
-            onClicked: root.runAction(["peak", "edid"])
+            onClicked: {
+              peakDebounce.stop()
+              root.runAction(["peak", "edid"])
+            }
           }
         }
 

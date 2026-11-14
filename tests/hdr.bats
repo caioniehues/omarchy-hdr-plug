@@ -196,13 +196,20 @@ saved_preset() {
 
 @test "peak overrides clamp to 250..1500 nits" {
   hdr_set peak 100
-  [[ "$(last_eval)" == *"max_luminance = 250,"* ]]
+  [[ "$(last_eval)" == *"min_luminance = 0, max_luminance = 250,"* ]]
   hdr_set peak 5000
-  [[ "$(last_eval)" == *"max_luminance = 1500,"* ]]
+  [[ "$(last_eval)" == *"min_luminance = 0, max_luminance = 1500,"* ]]
 }
 
 @test "a non-numeric peak is rejected" {
   run hdr_set peak lots
   [ "$status" -ne 0 ]
   [ -z "$(last_eval)" ]
+}
+
+@test "a peak override survives later actions" {
+  hdr_set peak 600
+  hdr_set vrr 1
+  hdr_set preset bright
+  [[ "$(last_eval)" == *"min_luminance = 0, max_luminance = 600,"* ]]
 }
