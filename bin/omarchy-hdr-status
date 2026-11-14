@@ -22,7 +22,7 @@ read_edid_caps() {
   local avg_l=250
   local min_l=0.05
 
-  for candidate in /sys/class/drm/*-"$mon"/edid; do
+  for candidate in "${HDR_SYSFS_DRM:-/sys/class/drm}"/*-"$mon"/edid; do
     if [[ -r "$candidate" ]]; then
       edid_file="$candidate"
       break

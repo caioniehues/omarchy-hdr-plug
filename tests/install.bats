@@ -19,8 +19,10 @@ install_sandbox() {
   "$REPO/install.sh" >/dev/null
   [ -d "$HOME/.config/omarchy/plugins/caioniehues.hdr" ]
   grep -q 'hypr.hdr' "$HOME/.config/hypr/hyprland.lua"
+  jq -e '.bar.layout.right | map(.id) | index("caioniehues.hdr")' "$HOME/.config/omarchy/shell.json"
 
   "$REPO/install.sh" --uninstall >/dev/null
+  mkdir -p "$XDG_STATE_HOME"
   run grep -rl 'hdr' "$HOME/.config" "$XDG_STATE_HOME"
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 1 ]
 }

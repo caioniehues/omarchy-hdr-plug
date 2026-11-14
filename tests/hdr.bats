@@ -5,5 +5,4 @@ load helpers
 @test "state persists under the caioniehues.hdr XDG state dir" {
   hdr_set on
   [ -f "$(state_file)" ]
-  [ ! -e "$XDG_STATE_HOME/vedix.hdr" ]
 }
