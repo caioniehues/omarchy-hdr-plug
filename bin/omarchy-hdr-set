@@ -30,7 +30,7 @@ def rule:
   "hl.monitor({ output = \("desc:" + .desc | tojson), cm = \($c.cm | tojson), " +
   "sdrbrightness = \($c.b), sdrsaturation = \($c.s), " +
   "sdr_min_luminance = \(.edidMinLuminance), sdr_max_luminance = \(.sdrMaxLuminance), " +
-  "min_luminance = \(.edidMinLuminance), max_luminance = \(.edidMaxLuminance), " +
+  "min_luminance = \(.edidMinLuminance), max_luminance = \(.peakOverride // .edidMaxLuminance), " +
   "max_avg_luminance = \(.edidAvgLuminance), sdr_eotf = \(.sdrEotf // "gamma22" | tojson), " +
   "vrr = \(.vrr // 2) })";'
 
@@ -119,6 +119,7 @@ SDR_MAX_L=$(jq -r '.sdrMaxLuminance' <<<"$CURRENT_JSON")
 CM_PRESET=$(jq -r '.cm' <<<"$CURRENT_JSON")
 SDR_EOTF=$(jq -r '.sdrEotf' <<<"$CURRENT_JSON")
 VRR=$(jq -r '.vrr' <<<"$CURRENT_JSON")
+PEAK_OVERRIDE=$(jq -r '.peakOverride' <<<"$CURRENT_JSON")
 PRESET=$(jq -r '.preset' <<<"$CURRENT_JSON")
 COLOR_TEMP=$(jq -r '.colorTemp' <<<"$CURRENT_JSON")
 
@@ -154,6 +155,16 @@ case "$ACTION" in
   cm) [[ -n "$PARAM" ]] && CM_PRESET="$PARAM"; PRESET="custom" ;;
   sdr_eotf) [[ -n "$PARAM" ]] && SDR_EOTF="$PARAM"; PRESET="custom" ;;
   vrr) [[ -n "$PARAM" ]] && VRR="$PARAM" ;;
+  peak)
+    # Manual HDR peak (nits) for panels whose real peak differs from the EDID; "edid" clears it.
+    if [[ "$PARAM" == "edid" ]]; then
+      PEAK_OVERRIDE=null
+    elif [[ "$PARAM" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+      PEAK_OVERRIDE=$(awk -v p="$PARAM" 'BEGIN { v = int(p + 0.5); if (v < 250) v = 250; if (v > 1500) v = 1500; print v }')
+    else
+      echo "omarchy-hdr-set: peak must be nits or 'edid'" >&2; exit 2
+    fi
+    ;;
   preset)
     SDR_WHITE=$(jq -r '.presetSdrWhite' <<<"$CURRENT_JSON")
     # All presets use cm=hdr, saturation 1, gamma 2.2, 6500 K; sdr sends srgb only because it disables HDR.
@@ -195,6 +206,7 @@ STATE=$(read_state | jq \
   --arg cm "$CM_PRESET" \
   --arg sdrEotf "$SDR_EOTF" \
   --argjson vrr "$VRR" \
+  --argjson peakOverride "$PEAK_OVERRIDE" \
   --arg preset "$PRESET" \
   --argjson edidMinL "$EDID_MIN_L" \
   --argjson edidMaxL "$EDID_MAX_L" \
@@ -209,6 +221,7 @@ STATE=$(read_state | jq \
     cm: $cm,
     sdrEotf: $sdrEotf,
     vrr: $vrr,
+    peakOverride: $peakOverride,
     preset: $preset,
     edidMinLuminance: $edidMinL,
     edidMaxLuminance: $edidMaxL,

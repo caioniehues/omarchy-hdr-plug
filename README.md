@@ -24,6 +24,7 @@ Omarchy bar plugin to control HDR, color profiles and color temperature under Hy
   - Color space selector (HDR / DCI-P3 / sRGB) and sliders for target SDR luminance, SDR brightness boost and SDR saturation.
   - SDR transfer curve: `Gamma 2.2` (default; matches how the panel shows SDR, keeps shadows dark) or `sRGB` piecewise.
   - Variable refresh rate: `Off`, `On`, or `Fullscreen only` (default; avoids OLED brightness flicker on the desktop). Presets leave it alone.
+  - HDR peak override (250–1500 nits) for panels whose real peak differs from the EDID; `EDID` restores the EDID value. It feeds Hyprland's `max_luminance`.
   - **Reset** button with a confirmation dialog to restore the native display settings.
 - **XDG persistence**: per-monitor state (keyed by monitor description) in `~/.local/state/caioniehues.hdr/state.json`; generated Hyprland config in `~/.config/hypr/hdr.lua`.
 
@@ -69,6 +70,7 @@ To remove the plugin completely and restore the system as if it had never been i
   - `cm <preset>`
   - `sdr_eotf gamma22|srgb`
   - `vrr 0|1|2` (off / on / fullscreen only)
+  - `peak <nits>|edid` (clamped to 250..1500)
   - `apply <brightness> <saturation> <max_luminance> <cm>`
   - `reset` (resets `hyprsunset`, deletes `hdr.lua` and `state.json`, reloads Hyprland). Afterwards no rule sets the plugin-owned keys, so Hyprland defaults apply (HDR off, global VRR) until you restore them in `monitors.lua` or use the plugin again.
 

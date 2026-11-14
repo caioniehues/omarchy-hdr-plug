@@ -30,6 +30,9 @@ Panel {
   property string cmPreset: "hdr"
   property string sdrEotf: "gamma22"
   property int vrr: 2
+  property int peakLum: 300
+  property bool peakOverridden: false
+  property int pendingPeak: 300
   property string currentPreset: "desktop"
   property real colorTemp: 6500
   property real pendingTemp: 6500
@@ -110,6 +113,13 @@ Panel {
     ])
   }
 
+  Timer {
+    id: peakDebounce
+    interval: 400
+    repeat: false
+    onTriggered: root.runAction(["peak", root.pendingPeak.toString()])
+  }
+
   Process {
     id: statusProc
     command: [root.statusScript]
@@ -134,6 +144,10 @@ Panel {
           root.cmPreset = data.cm || "hdr"
           root.sdrEotf = data.sdrEotf || "gamma22"
           root.vrr = data.vrr !== undefined ? data.vrr : 2
+          if (!peakDebounce.running) {
+            root.peakLum = data.peakLuminance !== undefined ? data.peakLuminance : root.edidMaxLum
+          }
+          root.peakOverridden = data.peakOverride !== undefined && data.peakOverride !== null
           root.currentPreset = data.preset || "custom"
           if (!tempDebounce.running && data.colorTemp !== undefined) {
             root.colorTemp = data.colorTemp
@@ -542,6 +556,39 @@ Panel {
               value: root.sdrSaturation
               onMoved: function(v) { root.sdrSaturation = v; root.scheduleSliders() }
             }
+          }
+        }
+
+        // HDR peak override (EDID peak by default)
+        Item {
+          visible: root.hdrCapable
+          width: parent.width
+          implicitHeight: Math.max(peakField.implicitHeight, peakReset.implicitHeight)
+
+          NumberField {
+            id: peakField
+            label: strings.t("peak_lum") + " (EDID " + Math.round(root.edidMaxLum) + ")"
+            foreground: root.panelForeground
+            from: 250
+            to: 1500
+            stepSize: 10
+            value: root.peakLum
+            onModified: function(v) {
+              root.peakLum = v
+              root.pendingPeak = v
+              peakDebounce.restart()
+            }
+          }
+
+          Button {
+            id: peakReset
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            text: "EDID"
+            bordered: true
+            selected: !root.peakOverridden
+            tooltipText: strings.t("peak_reset_tooltip")
+            onClicked: root.runAction(["peak", "edid"])
           }
         }
 

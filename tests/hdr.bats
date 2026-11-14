@@ -183,3 +183,26 @@ saved_preset() {
   [[ "${lines[0]}" == *"sdr_max_luminance = 251,"*"vrr = 0"* ]]
   [[ "${lines[1]}" == *"sdr_max_luminance = 250,"*"vrr = 0"* ]]
 }
+
+@test "a peak override replaces the EDID peak in the rule and edid restores it" {
+  hdr_set peak 600
+  [[ "$(last_eval)" == *"max_luminance = 600,"* ]]
+  grep -q "max_luminance = 600," "$(hdr_lua)"
+  run hdr_status
+  [ "$(jq -c '[.peakLuminance, .edidMaxLuminance]' <<<"$output")" = '[600,400]' ]
+  hdr_set peak edid
+  [[ "$(last_eval)" == *"max_luminance = 400,"* ]]
+}
+
+@test "peak overrides clamp to 250..1500 nits" {
+  hdr_set peak 100
+  [[ "$(last_eval)" == *"max_luminance = 250,"* ]]
+  hdr_set peak 5000
+  [[ "$(last_eval)" == *"max_luminance = 1500,"* ]]
+}
+
+@test "a non-numeric peak is rejected" {
+  run hdr_set peak lots
+  [ "$status" -ne 0 ]
+  [ -z "$(last_eval)" ]
+}

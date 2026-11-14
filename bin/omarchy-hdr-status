@@ -74,6 +74,8 @@ jq -n \
     edidMaxLuminance: $edidMax,
     edidAvgLuminance: $edidAvg,
     edidMinLuminance: $edidMin,
+    peakOverride: $s.peakOverride,
+    peakLuminance: ($s.peakOverride | or_default($edidMax)),
     presetSdrWhite: $white,
     cm: ($s.cm | or_default(if $hdrCapable then "hdr" else "srgb" end)),
     sdrEotf: ($s.sdrEotf | or_default("gamma22")),

@@ -26,6 +26,8 @@
   "vrr_off": "Désactivé",
   "vrr_on": "Activé",
   "vrr_fullscreen": "Plein écran uniquement",
+  "peak_lum": "Pic HDR (nits)",
+  "peak_reset_tooltip": "Utiliser la luminance de pic indiquée par l'EDID de l'écran",
   "presets_title": "Profils Rapides",
   "rescan": "Rescan Écran",
   "rescan_tooltip": "Réanalyser le matériel, la dalle et l'EDID",

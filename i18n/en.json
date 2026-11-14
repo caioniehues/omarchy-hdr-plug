@@ -26,6 +26,8 @@
   "vrr_off": "Off",
   "vrr_on": "On",
   "vrr_fullscreen": "Fullscreen only",
+  "peak_lum": "HDR Peak (nits)",
+  "peak_reset_tooltip": "Use the peak luminance reported by the display's EDID",
   "presets_title": "Quick Presets",
   "rescan": "Rescan Display",
   "rescan_tooltip": "Rescan hardware capabilities, display and EDID",
