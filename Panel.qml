@@ -16,6 +16,7 @@ Panel {
   implicitHeight: button.implicitHeight
 
   property bool hdrEnabled: true
+  property bool anyHdrEnabled: true
   property bool hdrCapable: true
   property string selectedMonitor: ""
   property string monitor: ""
@@ -129,6 +130,7 @@ Panel {
         try {
           var data = JSON.parse(text)
           root.hdrEnabled = data.enabled === true
+          root.anyHdrEnabled = data.anyHdrEnabled === true
           root.hdrCapable = data.hdrCapable !== false
           root.monitor = data.monitor || ""
           root.monitorName = data.monitorName || root.monitor
@@ -319,14 +321,14 @@ Panel {
             minimum: 3000
             maximum: 9000
             step: 100
-            enabled: !root.hdrEnabled
+            enabled: !root.anyHdrEnabled
             opacity: enabled ? 1 : 0.4
             value: root.colorTemp
             onMoved: function(v) { root.scheduleTemp(v) }
           }
 
           Text {
-            visible: root.hdrEnabled
+            visible: root.anyHdrEnabled
             width: parent.width
             wrapMode: Text.WordWrap
             text: strings.t("temp_hdr_note")

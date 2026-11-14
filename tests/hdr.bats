@@ -229,7 +229,7 @@ hyprsunset_running() {
   printf '#!/usr/bin/env bash\ntouch "%s/spawned"\n' "$BATS_TEST_TMPDIR" > "$BATS_TEST_TMPDIR/bin/hyprsunset"
   chmod +x "$BATS_TEST_TMPDIR/bin/hyprsunset"
   hdr_set off
-  hdr_set temperature 5000
+  run hdr_set temperature 5000
   [ ! -e "$BATS_TEST_TMPDIR/spawned" ]
 }
 
@@ -247,4 +247,28 @@ hyprsunset_running() {
   hdr_set temperature 5000
   hdr_set on
   [ "$(grep '^hyprsunset' "$HYPRCTL_LOG" | tail -1)" = "hyprsunset identity" ]
+}
+
+@test "enabling HDR always resets hyprsunset, even if something else tinted it" {
+  hyprsunset_running
+  hdr_set off
+  hdr_set on
+  [ "$(grep '^hyprsunset' "$HYPRCTL_LOG" | tail -1)" = "hyprsunset identity" ]
+}
+
+@test "temperature is refused while any saved monitor is in HDR" {
+  hyprsunset_running
+  mkdir -p "$(dirname "$(state_file)")"
+  echo '{"monitors":{"Other HDR Panel":{"enabled":true}}}' > "$(state_file)"
+  hdr_set off
+  run hdr_set temperature 5000
+  [ "$status" -ne 0 ]
+  ! grep -q '^hyprsunset temperature' "$HYPRCTL_LOG"
+}
+
+@test "temperature without a running hyprsunset fails and is not saved" {
+  hdr_set off
+  run hdr_set temperature 5000
+  [ "$status" -ne 0 ]
+  [ "$(jq -r '.colorTemp' "$(state_file)")" = 6500 ]
 }

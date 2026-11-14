@@ -68,6 +68,9 @@ jq -n \
     monitorName: $mon.description,
     hdrCapable: $hdrCapable,
     enabled: ($s.enabled | or_default($mon.colorManagementPreset == "hdr")),
+    # hyprsunset is global, so color temperature is blocked while any monitor is in HDR.
+    anyHdrEnabled: (($s.enabled | or_default($mon.colorManagementPreset == "hdr"))
+      or ([$state.monitors[]?.enabled] | any)),
     sdrBrightness: ($s.sdrBrightness | or_default(1)),
     sdrSaturation: ($s.sdrSaturation | or_default(1)),
     sdrMaxLuminance: ($s.sdrMaxLuminance | or_default($white)),

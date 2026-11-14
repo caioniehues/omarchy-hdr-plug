@@ -69,10 +69,9 @@ write_state() {
 }
 
 reset_all() {
-  if pgrep -x hyprsunset >/dev/null 2>&1; then
-    hyprctl hyprsunset identity >/dev/null 2>&1 || true
-  fi
-  rm -f "$HDR_CONF" "$STATE_FILE"
+  apply_color_temp 6500 >/dev/null
+  # hyprsunset.pid: left behind by versions that spawned their own hyprsunset.
+  rm -f "$HDR_CONF" "$STATE_FILE" "$STATE_DIR/hyprsunset.pid"
   rmdir "$STATE_DIR" 2>/dev/null || true
 
   # Reload restores the user's own monitors.lua rules.
@@ -107,9 +106,13 @@ COLOR_TEMP=$(jq -r '.colorTemp' <<<"$CURRENT_JSON")
 # hyprsunset's CTM is applied after PQ encoding, so under HDR it tints the picture instead of
 # shifting the white point (hyprwm/Hyprland discussion #15747).
 if [[ "$ACTION" == "temperature" ]]; then
-  if [[ "$IS_ENABLED" == "true" ]]; then
-    echo "omarchy-hdr-set: color temperature is unavailable while HDR is on" >&2
+  if [[ "$(jq -r '.anyHdrEnabled' <<<"$CURRENT_JSON")" == "true" ]]; then
+    echo "omarchy-hdr-set: color temperature is unavailable while a monitor is in HDR" >&2
     exit 2
+  fi
+  if ! pgrep -x hyprsunset >/dev/null 2>&1; then
+    echo "omarchy-hdr-set: hyprsunset is not running" >&2
+    exit 1
   fi
   [[ -n "$PARAM" ]] && COLOR_TEMP=$(apply_color_temp "$PARAM")
   STATE=$(read_state | jq --argjson ct "$COLOR_TEMP" '.colorTemp = $ct')
@@ -162,16 +165,15 @@ case "$ACTION" in
       sdr)     set -- false 1     "$SDR_WHITE" ;;
       *) echo "omarchy-hdr-set: unknown preset '$PARAM'" >&2; exit 2 ;;
     esac
-    IS_ENABLED=$1 SDR_B=$2 SDR_S=1 SDR_MAX_L=$3 CM_PRESET=hdr SDR_EOTF=gamma22 PRESET="$PARAM"
-    COLOR_TEMP=$(apply_color_temp 6500)
+    IS_ENABLED=$1 SDR_B=$2 SDR_S=1 SDR_MAX_L=$3 CM_PRESET=hdr SDR_EOTF=gamma22 PRESET="$PARAM" COLOR_TEMP=6500
+    [[ "$IS_ENABLED" == "false" ]] && apply_color_temp 6500 >/dev/null
     ;;
   *) echo "omarchy-hdr-set: unknown action '$ACTION'" >&2; exit 2 ;;
 esac
 
-# No color temperature under HDR (see the temperature fast path): keep hyprsunset at identity.
-if [[ "$IS_ENABLED" == "true" && "$COLOR_TEMP" != "6500" ]]; then
-  COLOR_TEMP=$(apply_color_temp 6500)
-fi
+# No color temperature under HDR (see the temperature fast path). Reset unconditionally: something
+# else (e.g. a nightlight profile) may have tinted the shared hyprsunset.
+[[ "$IS_ENABLED" == "true" ]] && COLOR_TEMP=$(apply_color_temp 6500)
 
 # 3. Validate user input (it ends up in Lua), then persist per-monitor state keyed by description
 for v in "$SDR_B" "$SDR_S" "$SDR_MAX_L"; do
@@ -230,7 +232,7 @@ hyprctl eval "$(jq -r "$RULE_JQ"' rule' <<<"$MONITOR_ENTRY")" >/dev/null 2>&1 ||
 
 if [[ "$IS_ENABLED" == "true" ]]; then
   [[ "$ACTION" =~ ^(toggle|on|preset)$ ]] &&
-    notify_hdr "HDR Display ($CONNECTOR)" "HDR enabled ($CM_PRESET • ${SDR_MAX_L} nits • ${COLOR_TEMP}K)"
+    notify_hdr "HDR Display ($CONNECTOR)" "HDR enabled ($CM_PRESET • ${SDR_MAX_L} nits)"
 else
   [[ "$ACTION" =~ ^(toggle|off|preset)$ ]] &&
     notify_hdr "HDR Display ($CONNECTOR)" "Standard SDR mode enabled"
