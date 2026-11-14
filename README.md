@@ -10,7 +10,7 @@ Omarchy bar plugin to control HDR, color profiles and color temperature under Hy
 - **Control panel** (`Panel.qml`):
   - Detects the monitor, its EDID HDR capabilities (max luminance in nits), and supports multiple monitors (`Dropdown`).
   - HDR on/off switch and hardware rescan button (`󰑐`).
-  - Color temperature slider (3000–9000 K) driven by `hyprsunset`, debounced.
+  - Color temperature slider (3000–9000 K), **SDR only**, driven through the `hyprsunset` Omarchy already runs (the plugin never starts or stops it). Under HDR it is disabled and hyprsunset is kept at identity: Hyprland applies hyprsunset's color matrix after PQ encoding, which tints the picture instead of moving the white point ([hyprwm/Hyprland#15747](https://github.com/hyprwm/Hyprland/discussions/15747)).
   - Presets tuned for OLED, derived from the EDID (SDR white = frame-average luminance rounded to 10 nits, 250 on the Odyssey G95SC):
 
     | Preset | HDR | SDR white | SDR boost | Saturation |
@@ -44,7 +44,7 @@ The panel UI is English by default; `i18n/fr.json` provides a French locale.
 - `hyprctl` / Hyprland
 - `jq`
 - `edid-decode` (reads EDID capabilities)
-- `hyprsunset` (color temperature)
+- `hyprsunset` (color temperature in SDR; must already be running, e.g. via Omarchy)
 - `notify-send` (optional notifications)
 
 ## Install & uninstall
@@ -64,7 +64,7 @@ To remove the plugin completely and restore the system as if it had never been i
 - `bin/omarchy-hdr-status [connector|description]`: prints the full JSON state (monitors, EDID, current settings).
 - `bin/omarchy-hdr-set [--monitor <connector|description>] <action> [param...]`:
   - `toggle`, `on`, `off`
-  - `temperature <3000..9000>`
+  - `temperature <3000..9000>` (SDR only; refused while HDR is on)
   - `preset desktop|bright|cinema|sdr`
   - `sdr_brightness <val>`, `sdr_saturation <val>`, `sdr_max_lum <nits>`
   - `cm <preset>`

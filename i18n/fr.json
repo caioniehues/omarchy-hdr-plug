@@ -10,6 +10,7 @@
   "hdr_capable": "Compatible HDR",
   "hdr_not_supported": "SDR Uniquement",
   "color_temp": "Température Couleur",
+  "temp_hdr_note": "La température de couleur est inexacte en HDR (Hyprland l'applique après l'encodage PQ). Disponible en SDR.",
   "hdr_modes": "Modes HDR",
   "sdr_modes": "Modes SDR",
   "preset_desktop": "Bureau HDR",

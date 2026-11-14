@@ -319,8 +319,20 @@ Panel {
             minimum: 3000
             maximum: 9000
             step: 100
+            enabled: !root.hdrEnabled
+            opacity: enabled ? 1 : 0.4
             value: root.colorTemp
             onMoved: function(v) { root.scheduleTemp(v) }
+          }
+
+          Text {
+            visible: root.hdrEnabled
+            width: parent.width
+            wrapMode: Text.WordWrap
+            text: strings.t("temp_hdr_note")
+            font.family: Style.font.family
+            font.pixelSize: Style.font.bodySmall
+            color: Util.alpha(root.panelForeground, 0.6)
           }
         }
 

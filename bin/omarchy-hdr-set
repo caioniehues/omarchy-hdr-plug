@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Changes HDR settings for one monitor: updates per-monitor state, applies a color-only rule live via
-# `hyprctl eval`, drives hyprsunset, and regenerates ~/.config/hypr/hdr.lua.
+# `hyprctl eval`, drives an already running hyprsunset (SDR only), and regenerates ~/.config/hypr/hdr.lua.
 #
 # Rules are keyed by `desc:<description>` and carry only color and vrr keys. Hyprland merges a rule into
 # the earlier one with the identical output string, so mode/position/scale from monitors.lua stay intact.
@@ -10,7 +10,6 @@ PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATUS_BIN="$PLUGIN_DIR/bin/omarchy-hdr-status"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/caioniehues.hdr"
 STATE_FILE="$STATE_DIR/state.json"
-HYPRSUNSET_PID_FILE="$STATE_DIR/hyprsunset.pid"
 HDR_CONF="$HOME/.config/hypr/hdr.lua"
 
 TARGET_MON="${HDR_MONITOR:-}"
@@ -42,27 +41,17 @@ notify_hdr() {
   fi
 }
 
+# Talks to the hyprsunset Omarchy already runs; never starts or stops one. Prints the clamped Kelvin.
 apply_color_temp() {
   local temp
   temp=$(awk -v t="$1" 'BEGIN { v = int(t + 0.5); if (v < 3000) v = 3000; if (v > 9000) v = 9000; print v }')
-
-  if command -v hyprsunset >/dev/null 2>&1; then
-    if ! pgrep -x hyprsunset >/dev/null 2>&1 && [[ "$temp" -ne 6500 ]]; then
-      mkdir -p "$STATE_DIR"
-      nohup hyprsunset >/dev/null 2>&1 &
-      echo $! > "$HYPRSUNSET_PID_FILE"
-      sleep 0.25
-    fi
-
-    if pgrep -x hyprsunset >/dev/null 2>&1; then
-      if [[ "$temp" -eq 6500 ]]; then
-        hyprctl hyprsunset identity >/dev/null 2>&1 || true
-      else
-        hyprctl hyprsunset temperature "$temp" >/dev/null 2>&1 || true
-      fi
+  if pgrep -x hyprsunset >/dev/null 2>&1; then
+    if [[ "$temp" -eq 6500 ]]; then
+      hyprctl hyprsunset identity >/dev/null 2>&1 || true
+    else
+      hyprctl hyprsunset temperature "$temp" >/dev/null 2>&1 || true
     fi
   fi
-
   echo "$temp"
 }
 
@@ -83,15 +72,6 @@ reset_all() {
   if pgrep -x hyprsunset >/dev/null 2>&1; then
     hyprctl hyprsunset identity >/dev/null 2>&1 || true
   fi
-  if [[ -f "$HYPRSUNSET_PID_FILE" ]]; then
-    local pid
-    pid=$(cat "$HYPRSUNSET_PID_FILE" 2>/dev/null || true)
-    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
-      kill "$pid" >/dev/null 2>&1 || true
-    fi
-    rm -f "$HYPRSUNSET_PID_FILE"
-  fi
-
   rm -f "$HDR_CONF" "$STATE_FILE"
   rmdir "$STATE_DIR" 2>/dev/null || true
 
@@ -124,7 +104,13 @@ PRESET=$(jq -r '.preset' <<<"$CURRENT_JSON")
 COLOR_TEMP=$(jq -r '.colorTemp' <<<"$CURRENT_JSON")
 
 # Fast path: color temperature only touches hyprsunset and the global colorTemp.
+# hyprsunset's CTM is applied after PQ encoding, so under HDR it tints the picture instead of
+# shifting the white point (hyprwm/Hyprland discussion #15747).
 if [[ "$ACTION" == "temperature" ]]; then
+  if [[ "$IS_ENABLED" == "true" ]]; then
+    echo "omarchy-hdr-set: color temperature is unavailable while HDR is on" >&2
+    exit 2
+  fi
   [[ -n "$PARAM" ]] && COLOR_TEMP=$(apply_color_temp "$PARAM")
   STATE=$(read_state | jq --argjson ct "$COLOR_TEMP" '.colorTemp = $ct')
   write_state <<<"$STATE"
@@ -181,6 +167,11 @@ case "$ACTION" in
     ;;
   *) echo "omarchy-hdr-set: unknown action '$ACTION'" >&2; exit 2 ;;
 esac
+
+# No color temperature under HDR (see the temperature fast path): keep hyprsunset at identity.
+if [[ "$IS_ENABLED" == "true" && "$COLOR_TEMP" != "6500" ]]; then
+  COLOR_TEMP=$(apply_color_temp 6500)
+fi
 
 # 3. Validate user input (it ends up in Lua), then persist per-monitor state keyed by description
 for v in "$SDR_B" "$SDR_S" "$SDR_MAX_L"; do

@@ -213,3 +213,38 @@ saved_preset() {
   hdr_set preset bright
   [[ "$(last_eval)" == *"min_luminance = 0, max_luminance = 600,"* ]]
 }
+
+hyprsunset_running() {
+  printf '#!/usr/bin/env bash\n[[ "$*" == *hyprsunset* ]]\n' > "$BATS_TEST_TMPDIR/bin/pgrep"
+}
+
+@test "in SDR, temperature drives an already running hyprsunset" {
+  hyprsunset_running
+  hdr_set off
+  hdr_set temperature 5000
+  grep -q '^hyprsunset temperature 5000$' "$HYPRCTL_LOG"
+}
+
+@test "the plugin never launches its own hyprsunset" {
+  printf '#!/usr/bin/env bash\ntouch "%s/spawned"\n' "$BATS_TEST_TMPDIR" > "$BATS_TEST_TMPDIR/bin/hyprsunset"
+  chmod +x "$BATS_TEST_TMPDIR/bin/hyprsunset"
+  hdr_set off
+  hdr_set temperature 5000
+  [ ! -e "$BATS_TEST_TMPDIR/spawned" ]
+}
+
+@test "in HDR, temperature is refused because the CTM lands after PQ encoding" {
+  hyprsunset_running
+  hdr_set on
+  run hdr_set temperature 5000
+  [ "$status" -ne 0 ]
+  ! grep -q '^hyprsunset temperature' "$HYPRCTL_LOG"
+}
+
+@test "switching HDR on resets hyprsunset to identity" {
+  hyprsunset_running
+  hdr_set off
+  hdr_set temperature 5000
+  hdr_set on
+  [ "$(grep '^hyprsunset' "$HYPRCTL_LOG" | tail -1)" = "hyprsunset identity" ]
+}
